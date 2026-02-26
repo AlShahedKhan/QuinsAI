@@ -59,6 +59,26 @@ export type ApiErrorDto = {
     };
 };
 
+export type AuthUserDto = {
+    id: number;
+    name: string;
+    email: string;
+    email_verified_at: string | null;
+};
+
+export type AuthTokenDto = {
+    access_token: string;
+    token_type: 'Bearer';
+    expires_in: number;
+    user: AuthUserDto;
+};
+
+export type AuthState = {
+    status: 'loading' | 'authenticated' | 'unauthenticated';
+    accessToken: string | null;
+    user: AuthUserDto | null;
+};
+
 export type Paginated<T> = {
     data: T[];
     current_page: number;

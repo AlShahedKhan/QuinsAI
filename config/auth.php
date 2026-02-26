@@ -112,4 +112,22 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | API Refresh Token Settings
+    |--------------------------------------------------------------------------
+    |
+    | These values configure rotating refresh tokens used by the SPA auth
+    | flow. The cookie stores only the opaque token value while the database
+    | persists a one-way hash for verification and revocation.
+    |
+    */
+
+    'refresh' => [
+        'ttl_days' => (int) env('AUTH_REFRESH_TOKEN_TTL_DAYS', 30),
+        'cookie_name' => env('AUTH_REFRESH_COOKIE_NAME', 'refresh_token'),
+        'cookie_secure' => filter_var(env('AUTH_REFRESH_COOKIE_SECURE', true), FILTER_VALIDATE_BOOL),
+        'cookie_domain' => env('AUTH_REFRESH_COOKIE_DOMAIN'),
+    ],
+
 ];

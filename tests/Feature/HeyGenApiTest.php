@@ -7,6 +7,7 @@ use App\Models\HeyGenWebhookEvent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
@@ -20,9 +21,12 @@ test('video creation endpoint requires auth', function () {
 
 test('authenticated user can queue a heygen video job', function () {
     Queue::fake();
-    $user = User::factory()->create();
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+    Sanctum::actingAs($user);
 
-    $response = $this->actingAs($user)->postJson('/api/heygen/videos', [
+    $response = $this->postJson('/api/heygen/videos', [
         'avatar_id' => 'avatar_1',
         'voice_id' => 'voice_1',
         'script' => 'Hello from QuinsAI',
@@ -39,8 +43,8 @@ test('authenticated user can queue a heygen video job', function () {
 });
 
 test('video detail is scoped to owner', function () {
-    $owner = User::factory()->create();
-    $other = User::factory()->create();
+    $owner = User::factory()->create(['email_verified_at' => now()]);
+    $other = User::factory()->create(['email_verified_at' => now()]);
 
     $videoJob = HeyGenVideoJob::query()->create([
         'user_id' => $owner->id,
@@ -50,7 +54,9 @@ test('video detail is scoped to owner', function () {
         'status' => 'queued',
     ]);
 
-    $this->actingAs($other)->getJson("/api/heygen/videos/{$videoJob->id}")
+    Sanctum::actingAs($other);
+
+    $this->getJson("/api/heygen/videos/{$videoJob->id}")
         ->assertNotFound();
 });
 
@@ -58,19 +64,37 @@ test('quota blocks requests when daily limit is reached', function () {
     Queue::fake();
     config()->set('services.heygen.daily_request_limit', 1);
 
-    $user = User::factory()->create();
+    $user = User::factory()->create(['email_verified_at' => now()]);
+    Sanctum::actingAs($user);
 
-    $this->actingAs($user)->postJson('/api/heygen/videos', [
+    $this->postJson('/api/heygen/videos', [
         'avatar_id' => 'avatar_1',
         'voice_id' => 'voice_1',
         'script' => 'First request',
     ])->assertAccepted();
 
-    $this->actingAs($user)->postJson('/api/heygen/videos', [
+    $this->postJson('/api/heygen/videos', [
         'avatar_id' => 'avatar_1',
         'voice_id' => 'voice_1',
         'script' => 'Second request',
     ])->assertTooManyRequests();
+});
+
+test('unverified users cannot access heygen api', function () {
+    Queue::fake();
+    $user = User::factory()->create([
+        'email_verified_at' => null,
+    ]);
+    Sanctum::actingAs($user);
+
+    $this->postJson('/api/heygen/videos', [
+        'avatar_id' => 'avatar_1',
+        'voice_id' => 'voice_1',
+        'script' => 'Blocked due to unverified email.',
+    ])->assertForbidden()
+        ->assertJsonPath('error.code', 'email_unverified');
+
+    Queue::assertNothingPushed();
 });
 
 test('webhook is idempotent and only queues processing once', function () {

@@ -33,5 +33,29 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('heygen-webhook', function (Request $request): Limit {
             return Limit::perMinute(240)->by($request->ip());
         });
+
+        RateLimiter::for('auth-register', function (Request $request): Limit {
+            return Limit::perMinute(5)->by($request->ip());
+        });
+
+        RateLimiter::for('auth-login', function (Request $request): Limit {
+            return Limit::perMinute(10)->by($request->ip());
+        });
+
+        RateLimiter::for('auth-refresh', function (Request $request): Limit {
+            return Limit::perMinute(30)->by($request->ip());
+        });
+
+        RateLimiter::for('auth-password', function (Request $request): Limit {
+            return Limit::perMinute(6)->by($request->ip());
+        });
+
+        RateLimiter::for('auth-verify', function (Request $request): Limit {
+            return Limit::perMinute(6)->by($request->ip());
+        });
+
+        RateLimiter::for('auth-verify-resend', function (Request $request): Limit {
+            return Limit::perMinute(3)->by($request->user()?->id ?: $request->ip());
+        });
     }
 }

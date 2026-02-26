@@ -21,6 +21,16 @@ Laravel is a web application framework with expressive, elegant syntax. We belie
 
 Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
+## API Auth Notes
+
+This project uses Sanctum bearer access tokens with rotating refresh tokens.
+
+- Access tokens are short-lived (`SANCTUM_EXPIRATION`, default 15 minutes).
+- Refresh tokens are stored as secure `HttpOnly` cookies scoped to `/api/auth`.
+- In production, run behind HTTPS and keep `AUTH_REFRESH_COOKIE_SECURE=true`.
+- HeyGen endpoints require authenticated and email-verified users.
+- `POST /api/webhooks/heygen` remains public and is protected by signature verification.
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
