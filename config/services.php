@@ -35,4 +35,23 @@ return [
         ],
     ],
 
+    'heygen' => [
+        'base_url' => env('HEYGEN_BASE_URL', 'https://api.heygen.com'),
+        'api_key' => env('HEYGEN_API_KEY'),
+        'webhook_secret' => env('HEYGEN_WEBHOOK_SECRET'),
+        'timeout' => (int) env('HEYGEN_TIMEOUT', 20),
+        'retry_times' => (int) env('HEYGEN_RETRY_TIMES', 2),
+        'retry_sleep_ms' => (int) env('HEYGEN_RETRY_SLEEP_MS', 250),
+        'script_max_chars' => (int) env('HEYGEN_SCRIPT_MAX_CHARS', 1500),
+        'script_blocklist' => array_values(array_filter(array_map(
+            static fn (string $term): string => trim($term),
+            explode(',', (string) env('HEYGEN_SCRIPT_BLOCKLIST', ''))
+        ))),
+        'daily_request_limit' => (int) env('HEYGEN_DAILY_REQUEST_LIMIT', 5),
+        'daily_live_minute_limit' => (int) env('HEYGEN_DAILY_LIVE_MINUTE_LIMIT', 30),
+        'storage_disk' => env('HEYGEN_STORAGE_DISK', env('FILESYSTEM_DISK', 'local')),
+        'storage_prefix' => env('HEYGEN_STORAGE_PREFIX', 'heygen/videos'),
+        'reconcile_after_minutes' => (int) env('HEYGEN_RECONCILE_AFTER_MINUTES', 3),
+    ],
+
 ];
