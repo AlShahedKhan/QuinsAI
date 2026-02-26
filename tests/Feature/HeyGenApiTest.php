@@ -80,7 +80,7 @@ test('quota blocks requests when daily limit is reached', function () {
     ])->assertTooManyRequests();
 });
 
-test('unverified users cannot access heygen api', function () {
+test('unverified users can access heygen api when authenticated', function () {
     Queue::fake();
     $user = User::factory()->create([
         'email_verified_at' => null,
@@ -90,11 +90,11 @@ test('unverified users cannot access heygen api', function () {
     $this->postJson('/api/heygen/videos', [
         'avatar_id' => 'avatar_1',
         'voice_id' => 'voice_1',
-        'script' => 'Blocked due to unverified email.',
-    ])->assertForbidden()
-        ->assertJsonPath('error.code', 'email_unverified');
+        'script' => 'Allowed without email verification.',
+    ])->assertAccepted()
+        ->assertJsonPath('data.status', 'queued');
 
-    Queue::assertNothingPushed();
+    Queue::assertPushed(SubmitHeyGenVideoJob::class, 1);
 });
 
 test('webhook is idempotent and only queues processing once', function () {

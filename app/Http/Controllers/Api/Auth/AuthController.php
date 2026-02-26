@@ -9,7 +9,6 @@ use App\Models\User;
 use App\Services\Auth\AccessTokenService;
 use App\Services\Auth\InvalidRefreshTokenException;
 use App\Services\Auth\RefreshTokenService;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -33,13 +32,11 @@ class AuthController extends Controller
             'password' => (string) $payload['password'],
         ]);
 
-        event(new Registered($user));
-
         return response()->json([
-            'message' => 'Registration completed. Verify your email to access protected features.',
+            'message' => 'Registration completed. You can now sign in.',
             'data' => [
                 'user' => $this->serializeUser($user),
-                'verification_sent' => true,
+                'verification_sent' => false,
             ],
         ], Response::HTTP_CREATED);
     }

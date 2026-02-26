@@ -34,7 +34,7 @@ Route::prefix('auth')->group(function (): void {
     });
 });
 
-Route::middleware(['auth:sanctum', 'verified.api', 'throttle:heygen-read'])->prefix('heygen')->group(function (): void {
+Route::middleware(['auth:sanctum', 'throttle:heygen-read'])->prefix('heygen')->group(function (): void {
     Route::get('/catalog', CatalogController::class);
 
     Route::get('/videos', [VideoController::class, 'index']);

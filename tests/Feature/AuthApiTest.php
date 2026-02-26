@@ -2,9 +2,9 @@
 
 use App\Models\AuthRefreshToken;
 use App\Models\User;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\PersonalAccessToken;
 
 uses(RefreshDatabase::class);
@@ -22,7 +22,7 @@ function refreshCookieFromResponse(\Illuminate\Testing\TestResponse $response): 
     return null;
 }
 
-test('register sends verification notification', function () {
+test('register completes without sending verification notification', function () {
     Notification::fake();
 
     $response = $this->postJson('/api/auth/register', [
@@ -33,12 +33,12 @@ test('register sends verification notification', function () {
     ]);
 
     $response->assertCreated()
-        ->assertJsonPath('data.verification_sent', true);
+        ->assertJsonPath('data.verification_sent', false);
 
     $user = User::query()->where('email', 'new-user@example.com')->first();
     expect($user)->not->toBeNull();
 
-    Notification::assertSentTo($user, VerifyEmail::class);
+    Notification::assertNothingSent();
 });
 
 test('login returns access token and refresh cookie', function () {
@@ -118,7 +118,9 @@ test('logout revokes current access token and refresh token', function () {
     expect(AuthRefreshToken::query()->whereNull('revoked_at')->count())->toBe(0);
 });
 
-test('unverified user can login but cannot access heygen api', function () {
+test('unverified user can login and access heygen api', function () {
+    Queue::fake();
+
     $user = User::factory()->create([
         'password' => 'StrongPass#123',
         'email_verified_at' => null,
@@ -137,6 +139,8 @@ test('unverified user can login but cannot access heygen api', function () {
             'voice_id' => 'voice_1',
             'script' => 'Unverified access check',
         ])
-        ->assertForbidden()
-        ->assertJsonPath('error.code', 'email_unverified');
+        ->assertAccepted()
+        ->assertJsonPath('data.status', 'queued');
+
+    Queue::assertPushed(\App\Jobs\SubmitHeyGenVideoJob::class, 1);
 });

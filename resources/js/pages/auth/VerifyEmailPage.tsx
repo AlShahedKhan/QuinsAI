@@ -1,6 +1,9 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { isEmailVerified, useAuth } from '../../auth/AuthContext';
+import { AuthShell } from '../../components/ui/AuthShell';
+import { FormNotice } from '../../components/ui/FormNotice';
+import { SessionLoadingScreen } from '../../components/ui/SessionLoadingScreen';
 
 export function VerifyEmailPage() {
     const { state, resendVerification, logout } = useAuth();
@@ -9,11 +12,7 @@ export function VerifyEmailPage() {
     const [error, setError] = useState<string | null>(null);
 
     if (state.status === 'loading') {
-        return (
-            <main className="grid min-h-screen place-items-center bg-slate-100 text-slate-700">
-                Checking your session...
-            </main>
-        );
+        return <SessionLoadingScreen />;
     }
 
     if (state.status !== 'authenticated' || state.user === null) {
@@ -45,23 +44,27 @@ export function VerifyEmailPage() {
     }
 
     return (
-        <main className="grid min-h-screen place-items-center bg-slate-100 px-6 py-8">
-            <section className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h1 className="mb-2 text-2xl font-semibold text-slate-900">Verify Email</h1>
-                <p className="text-sm text-slate-700">
-                    Your account ({state.user.email}) is logged in but not verified. Verify your email before accessing HeyGen features.
+        <AuthShell
+            title="Verify Your Email"
+            subtitle={`Your account (${state.user.email}) is logged in. Complete email verification to unlock gated features.`}
+            eyebrow="Verification Required"
+            footer={(
+                <p>
+                    Already verified? <Link to="/login" className="font-semibold text-sky-700 hover:text-sky-800">Sign in again</Link>
                 </p>
-
-                <div className="mt-4 flex gap-2">
+            )}
+        >
+            <div className="space-y-4">
+                <div className="flex flex-wrap gap-3">
                     <button
                         type="button"
                         disabled={loading}
                         onClick={() => {
                             void handleResend();
                         }}
-                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                        className="btn-primary"
                     >
-                        {loading ? 'Sending...' : 'Resend Verification Email'}
+                        {loading ? 'Sending...' : 'Resend Verification'}
                     </button>
 
                     <button
@@ -69,19 +72,15 @@ export function VerifyEmailPage() {
                         onClick={() => {
                             void handleLogout();
                         }}
-                        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
+                        className="btn-secondary"
                     >
                         Logout
                     </button>
                 </div>
 
-                {message && <p className="mt-4 text-sm text-emerald-700">{message}</p>}
-                {error && <p className="mt-4 text-sm text-rose-700">{error}</p>}
-
-                <p className="mt-4 text-sm">
-                    Already verified? <Link to="/login" className="text-blue-700 underline">Sign in again</Link>
-                </p>
-            </section>
-        </main>
+                {message && <FormNotice tone="success">{message}</FormNotice>}
+                {error && <FormNotice tone="error">{error}</FormNotice>}
+            </div>
+        </AuthShell>
     );
 }

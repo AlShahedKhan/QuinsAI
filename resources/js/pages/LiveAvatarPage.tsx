@@ -1,14 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { heygenApi } from '../lib/heygenApi';
+import { FormNotice } from '../components/ui/FormNotice';
 import type { CatalogDto, LiveSessionDto } from '../types/heygen';
 
 type StreamingAvatarLike = {
     on?: (event: string, handler: (event: { detail?: MediaStream | null }) => void) => void;
-    off?: (event: string, handler: (...args: unknown[]) => void) => void;
     start?: (options?: Record<string, unknown>) => Promise<unknown>;
     createStartAvatar?: (options?: Record<string, unknown>) => Promise<unknown>;
     stop?: () => Promise<unknown>;
 };
+
+const qualityOptions = [
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+] as const;
 
 function resolveId(item: Record<string, unknown>): string {
     const candidates = [item.avatar_id, item.voice_id, item.id, item.name];
@@ -20,6 +26,18 @@ function resolveId(item: Record<string, unknown>): string {
     }
 
     return '';
+}
+
+function resolveLabel(item: Record<string, unknown>): string {
+    const candidates = [item.display_name, item.name, item.avatar_id, item.voice_id, item.id];
+
+    for (const candidate of candidates) {
+        if (typeof candidate === 'string' && candidate.trim() !== '') {
+            return candidate;
+        }
+    }
+
+    return 'Unknown';
 }
 
 export function LiveAvatarPage() {
@@ -36,25 +54,28 @@ export function LiveAvatarPage() {
     const videoRef = useRef<HTMLVideoElement | null>(null);
 
     useEffect(() => {
-        let mounted = true;
+        let active = true;
+
         heygenApi.getCatalog()
             .then((data) => {
-                if (!mounted) return;
+                if (!active) {
+                    return;
+                }
+
                 setCatalog(data);
-                if (data.avatars[0]) {
-                    setAvatarId(resolveId(data.avatars[0]));
-                }
-                if (data.voices[0]) {
-                    setVoiceId(resolveId(data.voices[0]));
-                }
+                setAvatarId((current) => current || (data.avatars[0] ? resolveId(data.avatars[0]) : ''));
+                setVoiceId((current) => current || (data.voices[0] ? resolveId(data.voices[0]) : ''));
             })
             .catch((err: Error) => {
-                if (!mounted) return;
+                if (!active) {
+                    return;
+                }
+
                 setError(err.message);
             });
 
         return () => {
-            mounted = false;
+            active = false;
         };
     }, []);
 
@@ -64,7 +85,9 @@ export function LiveAvatarPage() {
     );
 
     async function startSession() {
-        if (!canStart) return;
+        if (!canStart) {
+            return;
+        }
 
         setLoading(true);
         setError(null);
@@ -88,9 +111,7 @@ export function LiveAvatarPage() {
             }
 
             const AvatarCtor = constructorCandidate as new (options?: Record<string, unknown>) => StreamingAvatarLike;
-            const instance = new AvatarCtor({
-                token: created.token,
-            });
+            const instance = new AvatarCtor({ token: created.token });
 
             if (typeof instance.on === 'function') {
                 instance.on('stream_ready', (event: { detail?: MediaStream | null }) => {
@@ -119,13 +140,16 @@ export function LiveAvatarPage() {
             const normalized = err instanceof Error ? err : new Error('Failed to start live session.');
             setError(normalized.message);
             setStatusMessage(null);
+            setSession(null);
         } finally {
             setLoading(false);
         }
     }
 
     async function endSession() {
-        if (!session) return;
+        if (!session) {
+            return;
+        }
 
         setLoading(true);
         setError(null);
@@ -151,96 +175,148 @@ export function LiveAvatarPage() {
         }
     }
 
+    const selectedAvatar = catalog.avatars.find((avatar) => resolveId(avatar) === avatarId);
+    const selectedVoice = catalog.voices.find((voice) => resolveId(voice) === voiceId);
+
     return (
-        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-slate-900">Live Avatar</h2>
+        <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+            <article className="surface-card page-enter p-6 sm:p-7">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Realtime Streaming</p>
+                <h2 className="mt-1 text-2xl text-slate-900">Live Avatar Session</h2>
+                <p className="mt-2 text-sm text-slate-600">Launch or end live avatar sessions with backend-minted ephemeral tokens.</p>
 
-            <div className="grid gap-4 md:grid-cols-3">
-                <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Avatar</label>
-                    <select
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                        value={avatarId}
-                        onChange={(event) => setAvatarId(event.target.value)}
-                    >
-                        {catalog.avatars.map((avatar, index) => {
-                            const id = resolveId(avatar);
-                            return (
-                                <option key={id || `live-avatar-${index}`} value={id}>
-                                    {(avatar.display_name as string) || (avatar.name as string) || id}
-                                </option>
-                            );
-                        })}
-                    </select>
+                <div className="mt-5 grid gap-5">
+                    <div>
+                        <label className="field-label" htmlFor="live-avatar">Avatar</label>
+                        <select
+                            id="live-avatar"
+                            className="select-field"
+                            value={avatarId}
+                            onChange={(event) => setAvatarId(event.target.value)}
+                        >
+                            {catalog.avatars.length === 0 && <option value="">No avatars available</option>}
+                            {catalog.avatars.map((avatar, index) => {
+                                const id = resolveId(avatar);
+                                return (
+                                    <option key={id || `live-avatar-${index}`} value={id}>
+                                        {resolveLabel(avatar)}
+                                    </option>
+                                );
+                            })}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="field-label" htmlFor="live-voice">Voice</label>
+                        <select
+                            id="live-voice"
+                            className="select-field"
+                            value={voiceId}
+                            onChange={(event) => setVoiceId(event.target.value)}
+                        >
+                            {catalog.voices.length === 0 && <option value="">No voices available</option>}
+                            {catalog.voices.map((voice, index) => {
+                                const id = resolveId(voice);
+                                return (
+                                    <option key={id || `live-voice-${index}`} value={id}>
+                                        {resolveLabel(voice)}
+                                    </option>
+                                );
+                            })}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="field-label">Streaming Quality</label>
+                        <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-200/90 bg-slate-50 p-1">
+                            {qualityOptions.map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => setQuality(option.value)}
+                                    className={quality === option.value
+                                        ? 'rounded-lg bg-white px-2 py-2 text-sm font-semibold text-slate-900 shadow-sm'
+                                        : 'rounded-lg px-2 py-2 text-sm font-semibold text-slate-500'}
+                                >
+                                    {option.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 pt-1">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                void startSession();
+                            }}
+                            disabled={!canStart}
+                            className="btn-primary"
+                        >
+                            {loading ? 'Working...' : 'Start Session'}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                void endSession();
+                            }}
+                            disabled={loading || session === null}
+                            className="btn-secondary"
+                        >
+                            End Session
+                        </button>
+                    </div>
                 </div>
 
-                <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Voice</label>
-                    <select
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                        value={voiceId}
-                        onChange={(event) => setVoiceId(event.target.value)}
-                    >
-                        {catalog.voices.map((voice, index) => {
-                            const id = resolveId(voice);
-                            return (
-                                <option key={id || `live-voice-${index}`} value={id}>
-                                    {(voice.display_name as string) || (voice.name as string) || id}
-                                </option>
-                            );
-                        })}
-                    </select>
+                <div className="mt-5 space-y-3">
+                    {statusMessage && <FormNotice tone="success">{statusMessage}</FormNotice>}
+                    {error && <FormNotice tone="error">{error}</FormNotice>}
                 </div>
 
-                <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Quality</label>
-                    <select
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                        value={quality}
-                        onChange={(event) => setQuality(event.target.value as 'low' | 'medium' | 'high')}
-                    >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                    </select>
+                <div className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200/90 bg-white/85 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Selected Avatar</p>
+                        <p className="mt-1 font-semibold text-slate-900">{selectedAvatar ? resolveLabel(selectedAvatar) : 'N/A'}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200/90 bg-white/85 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Selected Voice</p>
+                        <p className="mt-1 font-semibold text-slate-900">{selectedVoice ? resolveLabel(selectedVoice) : 'N/A'}</p>
+                    </div>
                 </div>
-            </div>
+            </article>
 
-            <div className="mt-4 flex gap-2">
-                <button
-                    type="button"
-                    onClick={() => {
-                        void startSession();
-                    }}
-                    disabled={!canStart}
-                    className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                >
-                    {loading ? 'Working...' : 'Start Session'}
-                </button>
-                <button
-                    type="button"
-                    onClick={() => {
-                        void endSession();
-                    }}
-                    disabled={loading || session === null}
-                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50"
-                >
-                    End Session
-                </button>
-            </div>
+            <article className="surface-card page-enter stagger-1 p-6 sm:p-7">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Live Output</p>
+                        <h3 className="mt-1 text-xl text-slate-900">Streaming Stage</h3>
+                    </div>
 
-            {session && (
-                <p className="mt-3 text-sm text-slate-600">
-                    Session #{session.id} | Provider session: {session.provider_session_id ?? 'pending'}
-                </p>
-            )}
+                    <span className={`status-badge ${session ? 'status-completed' : 'status-default'}`}>
+                        {session ? 'Session Active' : 'Session Idle'}
+                    </span>
+                </div>
 
-            {statusMessage && <p className="mt-3 text-sm text-emerald-700">{statusMessage}</p>}
-            {error && <p className="mt-3 text-sm text-rose-700">{error}</p>}
+                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-950 shadow-inner">
+                    <div className="relative aspect-video w-full">
+                        <video ref={videoRef} className="h-full w-full object-cover" autoPlay playsInline muted />
+                        {!session && (
+                            <div className="absolute inset-0 grid place-items-center bg-slate-950/78 px-6 text-center">
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-100">No active stream</p>
+                                    <p className="mt-1 text-xs text-slate-300">Start a session to initialize WebRTC media.</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
 
-            <div className="mt-4 overflow-hidden rounded-lg border border-slate-300 bg-slate-950">
-                <video ref={videoRef} className="h-64 w-full object-cover" autoPlay playsInline muted />
-            </div>
+                <div className="mt-4 rounded-xl border border-slate-200/90 bg-white/85 px-4 py-3 text-sm text-slate-600">
+                    <p>Internal session ID: <span className="font-semibold text-slate-900">{session?.id ?? 'N/A'}</span></p>
+                    <p className="mt-1">Provider session: <span className="font-mono text-xs text-slate-700">{session?.provider_session_id ?? 'pending'}</span></p>
+                </div>
+            </article>
         </section>
     );
 }
