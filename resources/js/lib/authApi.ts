@@ -62,6 +62,15 @@ export const authApi = {
         }
     },
 
+    async adminLogin(payload: LoginInput): Promise<AuthTokenDto> {
+        try {
+            const response = await authClient.post<{ data: AuthTokenDto }>('/api/auth/admin/login', payload);
+            return response.data.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
     async refresh(): Promise<AuthTokenDto> {
         try {
             const response = await authClient.post<{ data: AuthTokenDto }>('/api/auth/refresh');

@@ -26,6 +26,7 @@ type AuthContextValue = {
     state: AuthState;
     register: (payload: RegisterInput) => Promise<{ message: string }>;
     login: (payload: LoginInput) => Promise<AuthUserDto>;
+    loginAdmin: (payload: LoginInput) => Promise<AuthUserDto>;
     logout: () => Promise<void>;
     logoutAll: () => Promise<void>;
     resendVerification: () => Promise<string>;
@@ -94,6 +95,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return tokenData.user;
     }, []);
 
+    const loginAdmin = useCallback(async (payload: LoginInput): Promise<AuthUserDto> => {
+        const tokenData = await authApi.adminLogin(payload);
+        setState(mapTokenToState(tokenData));
+        return tokenData.user;
+    }, []);
+
     const logout = useCallback(async (): Promise<void> => {
         const token = state.accessToken;
         try {
@@ -137,13 +144,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         state,
         register,
         login,
+        loginAdmin,
         logout,
         logoutAll,
         resendVerification,
         forgotPassword,
         resetPassword,
         refreshSilently,
-    }), [state, register, login, logout, logoutAll, resendVerification, forgotPassword, resetPassword, refreshSilently]);
+    }), [state, register, login, loginAdmin, logout, logoutAll, resendVerification, forgotPassword, resetPassword, refreshSilently]);
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

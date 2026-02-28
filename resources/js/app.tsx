@@ -12,6 +12,7 @@ import { VideoGeneratorPage } from './pages/VideoGeneratorPage';
 import { VideoHistoryPage } from './pages/VideoHistoryPage';
 import { LiveAvatarPage } from './pages/LiveAvatarPage';
 import { LoginPage } from './pages/auth/LoginPage';
+import { AdminLoginPage } from './pages/auth/AdminLoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
@@ -127,6 +128,7 @@ function AppRouter() {
             <Route path="/" element={<Navigate to="/videos/generate" replace />} />
 
             <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+            <Route path="/admin/login" element={<PublicOnlyRoute><AdminLoginPage /></PublicOnlyRoute>} />
             <Route path="/register" element={<PublicOnlyRoute><RegisterPage /></PublicOnlyRoute>} />
             <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPasswordPage /></PublicOnlyRoute>} />
             <Route path="/reset-password/:token" element={<PublicOnlyRoute><ResetPasswordPage /></PublicOnlyRoute>} />

@@ -1,13 +1,13 @@
-﻿import { FormEvent, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { AuthPanel } from '../../components/ui/AuthPanel';
 import { AuthTextField } from '../../components/ui/AuthTextField';
 import { FormNotice } from '../../components/ui/FormNotice';
 
-export function LoginPage() {
+export function AdminLoginPage() {
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { loginAdmin } = useAuth();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -20,10 +20,10 @@ export function LoginPage() {
         setError(null);
 
         try {
-            await login({ email, password });
+            await loginAdmin({ email, password });
             navigate('/videos/generate', { replace: true });
         } catch (err) {
-            const normalized = err instanceof Error ? err : new Error('Login failed.');
+            const normalized = err instanceof Error ? err : new Error('Admin login failed.');
             setError(normalized.message);
         } finally {
             setLoading(false);
@@ -33,41 +33,41 @@ export function LoginPage() {
     return (
         <AuthPanel mode="login">
             <form onSubmit={handleSubmit} className="chat-auth-form">
+                <FormNotice tone="info">Admin access only. Use seeded administrator credentials.</FormNotice>
+
                 <AuthTextField
-                    id="login-email"
-                    label="Email"
+                    id="admin-login-email"
+                    label="Admin Email"
                     type="email"
                     value={email}
-                    placeholder="Enter your email"
+                    placeholder="Enter admin email"
                     autoComplete="email"
                     icon="mail"
                     onChange={setEmail}
                 />
 
                 <AuthTextField
-                    id="login-password"
-                    label="Password"
+                    id="admin-login-password"
+                    label="Admin Password"
                     type="password"
                     value={password}
-                    placeholder="Enter your password"
+                    placeholder="Enter admin password"
                     autoComplete="current-password"
                     icon="lock"
                     onChange={setPassword}
                 />
 
-                <div className="chat-auth-link-row">
-                    <div className="flex items-center gap-4">
-                        <Link to="/forgot-password" className="chat-auth-link">Forgot password?</Link>
-                        <Link to="/admin/login" className="chat-auth-link">Admin login</Link>
-                    </div>
-                </div>
-
                 <button type="submit" disabled={loading} className="chat-auth-submit">
-                    {loading ? 'Signing in...' : 'Sign In'}
+                    {loading ? 'Signing in...' : 'Admin Sign In'}
                 </button>
 
                 {error && <FormNotice tone="error">{error}</FormNotice>}
+
+                <div className="chat-auth-link-row">
+                    <Link to="/login" className="chat-auth-link">Back to user login</Link>
+                </div>
             </form>
         </AuthPanel>
     );
 }
+

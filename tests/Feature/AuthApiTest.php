@@ -2,6 +2,7 @@
 
 use App\Models\AuthRefreshToken;
 use App\Models\User;
+use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
@@ -60,6 +61,39 @@ test('login returns access token and refresh cookie', function () {
     expect($cookie)->not->toBeNull();
     expect(AuthRefreshToken::query()->count())->toBe(1);
     expect(PersonalAccessToken::query()->count())->toBe(1);
+});
+
+test('admin login returns access token for admin account', function () {
+    $this->seed(RolePermissionSeeder::class);
+
+    $admin = User::factory()->admin()->create([
+        'password' => 'StrongPass#123',
+    ]);
+    $admin->assignRole('super-admin');
+
+    $response = $this->postJson('/api/auth/admin/login', [
+        'email' => $admin->email,
+        'password' => 'StrongPass#123',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('data.user.id', $admin->id)
+        ->assertJsonPath('data.user.is_admin', true)
+        ->assertJsonPath('data.token_type', 'Bearer');
+});
+
+test('admin login rejects non-admin account with generic credentials error', function () {
+    $this->seed(RolePermissionSeeder::class);
+
+    $user = User::factory()->create([
+        'password' => 'StrongPass#123',
+    ]);
+
+    $this->postJson('/api/auth/admin/login', [
+        'email' => $user->email,
+        'password' => 'StrongPass#123',
+    ])->assertUnprocessable()
+        ->assertJsonPath('error.code', 'invalid_credentials');
 });
 
 test('refresh rotates refresh token and returns new access token', function () {

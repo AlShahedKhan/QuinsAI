@@ -45,27 +45,28 @@ class AuthController extends Controller
     {
         $payload = $request->validated();
 
-        $user = User::query()
-            ->where('email', mb_strtolower((string) $payload['email']))
-            ->first();
-
-        if ($user === null || ! Hash::check((string) $payload['password'], (string) $user->password)) {
-            return response()->json([
-                'message' => 'The provided credentials are incorrect.',
-                'error' => [
-                    'code' => 'invalid_credentials',
-                ],
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        $user = $this->resolveUserFromCredentials((string) $payload['email'], (string) $payload['password']);
+        if ($user === null) {
+            return $this->invalidCredentialsResponse();
         }
 
-        $tokenPayload = $this->accessTokenService->issue($user, 'api-login');
-        $refreshToken = $this->refreshTokenService->issue($user, $request);
+        return $this->issueAuthResponse($user, $request, 'api-login');
+    }
 
-        return response()->json([
-            'data' => array_merge($tokenPayload, [
-                'user' => $this->serializeUser($user),
-            ]),
-        ], Response::HTTP_OK)->withCookie($this->refreshTokenService->makeCookie($refreshToken));
+    public function adminLogin(LoginRequest $request): JsonResponse
+    {
+        $payload = $request->validated();
+
+        $user = $this->resolveUserFromCredentials((string) $payload['email'], (string) $payload['password']);
+        if ($user === null) {
+            return $this->invalidCredentialsResponse();
+        }
+
+        if (! $user->isAdmin()) {
+            return $this->invalidCredentialsResponse();
+        }
+
+        return $this->issueAuthResponse($user, $request, 'api-admin-login');
     }
 
     public function refresh(Request $request): JsonResponse
@@ -131,7 +132,7 @@ class AuthController extends Controller
     }
 
     /**
-     * @return array{id: int, name: string, email: string, email_verified_at: ?string}
+     * @return array{id: int, name: string, email: string, email_verified_at: ?string, is_admin: bool, roles: array<int, string>}
      */
     private function serializeUser(User $user): array
     {
@@ -140,6 +141,43 @@ class AuthController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'email_verified_at' => $user->email_verified_at?->toIso8601String(),
+            'is_admin' => $user->isAdmin(),
+            'roles' => $user->getRoleNames()->values()->all(),
         ];
+    }
+
+    private function invalidCredentialsResponse(): JsonResponse
+    {
+        return response()->json([
+            'message' => 'The provided credentials are incorrect.',
+            'error' => [
+                'code' => 'invalid_credentials',
+            ],
+        ], Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    private function issueAuthResponse(User $user, Request $request, string $tokenName): JsonResponse
+    {
+        $tokenPayload = $this->accessTokenService->issue($user, $tokenName);
+        $refreshToken = $this->refreshTokenService->issue($user, $request);
+
+        return response()->json([
+            'data' => array_merge($tokenPayload, [
+                'user' => $this->serializeUser($user),
+            ]),
+        ], Response::HTTP_OK)->withCookie($this->refreshTokenService->makeCookie($refreshToken));
+    }
+
+    private function resolveUserFromCredentials(string $email, string $password): ?User
+    {
+        $user = User::query()
+            ->where('email', mb_strtolower($email))
+            ->first();
+
+        if ($user === null || ! Hash::check($password, (string) $user->password)) {
+            return null;
+        }
+
+        return $user;
     }
 }

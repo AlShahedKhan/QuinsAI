@@ -42,6 +42,16 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by($request->ip());
         });
 
+        RateLimiter::for('auth-admin-login', function (Request $request): Limit {
+            $email = mb_strtolower((string) $request->input('email', 'unknown'));
+
+            return Limit::perMinute(5)->by($email.'|'.$request->ip());
+        });
+
+        RateLimiter::for('admin-security', function (Request $request): Limit {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
         RateLimiter::for('auth-refresh', function (Request $request): Limit {
             return Limit::perMinute(30)->by($request->ip());
         });
