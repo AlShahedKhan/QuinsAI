@@ -132,7 +132,15 @@ class AuthController extends Controller
     }
 
     /**
-     * @return array{id: int, name: string, email: string, email_verified_at: ?string, is_admin: bool, roles: array<int, string>}
+     * @return array{
+     *   id: int,
+     *   name: string,
+     *   email: string,
+     *   email_verified_at: ?string,
+     *   is_admin: bool,
+     *   roles: array<int, string>,
+     *   permissions: array<int, string>
+     * }
      */
     private function serializeUser(User $user): array
     {
@@ -143,6 +151,7 @@ class AuthController extends Controller
             'email_verified_at' => $user->email_verified_at?->toIso8601String(),
             'is_admin' => $user->isAdmin(),
             'roles' => $user->getRoleNames()->values()->all(),
+            'permissions' => $user->getAllPermissions()->pluck('name')->sort()->values()->all(),
         ];
     }
 

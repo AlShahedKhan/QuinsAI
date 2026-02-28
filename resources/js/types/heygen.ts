@@ -66,6 +66,7 @@ export type AuthUserDto = {
     email_verified_at: string | null;
     is_admin: boolean;
     roles: string[];
+    permissions: string[];
 };
 
 export type AuthTokenDto = {
@@ -87,4 +88,19 @@ export type Paginated<T> = {
     last_page: number;
     per_page: number;
     total: number;
+};
+
+export type RoleDto = {
+    id: number;
+    name: string;
+    guard_name: string;
+    permissions: string[];
+    users_count: number;
+};
+
+export type PermissionDto = {
+    id: number;
+    name: string;
+    guard_name: string;
+    roles_count: number;
 };

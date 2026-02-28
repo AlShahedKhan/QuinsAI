@@ -19,6 +19,7 @@ type RetryRequestConfig = InternalAxiosRequestConfig & {
 
 const AUTH_ENDPOINTS = [
     '/api/auth/login',
+    '/api/auth/admin/login',
     '/api/auth/register',
     '/api/auth/refresh',
     '/api/auth/forgot-password',

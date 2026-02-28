@@ -3,9 +3,10 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import '../css/app.css';
 import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { AuthProvider, useAuth } from './auth/AuthContext';
+import { AuthProvider, canAccessAdmin, getAdminLandingPath, hasPermission, useAuth } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { PublicOnlyRoute } from './auth/PublicOnlyRoute';
+import { AdminRoute } from './auth/AdminRoute';
 import { heygenApi } from './lib/heygenApi';
 import { useVideoPolling } from './hooks/useVideoPolling';
 import { VideoGeneratorPage } from './pages/VideoGeneratorPage';
@@ -16,16 +17,39 @@ import { AdminLoginPage } from './pages/auth/AdminLoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
-import type { VideoJobDto } from './types/heygen';
+import { RolesAdminPage } from './pages/admin/RolesAdminPage';
+import { PermissionsAdminPage } from './pages/admin/PermissionsAdminPage';
+import type { AuthUserDto, VideoJobDto } from './types/heygen';
 
-const navItems = [
+const coreNavItems = [
     { to: '/videos/generate', label: 'Generate' },
     { to: '/videos', label: 'History' },
     { to: '/live', label: 'Live Avatar' },
 ] as const;
 
+function resolveHomePath(user: AuthUserDto | null): string {
+    return getAdminLandingPath(user) ?? '/videos/generate';
+}
+
+function buildNavItems(user: AuthUserDto | null): Array<{ to: string; label: string }> {
+    const items: Array<{ to: string; label: string }> = [...coreNavItems];
+
+    if (canAccessAdmin(user)) {
+        if (hasPermission(user, 'roles.view')) {
+            items.push({ to: '/admin/roles', label: 'Roles' });
+        }
+
+        if (hasPermission(user, 'permissions.view')) {
+            items.push({ to: '/admin/permissions', label: 'Permissions' });
+        }
+    }
+
+    return items;
+}
+
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
     const { state, logout } = useAuth();
+    const navItems = React.useMemo(() => buildNavItems(state.user), [state.user]);
 
     return (
         <main className="app-shell">
@@ -41,7 +65,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                     </div>
 
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        <nav className="flex items-center rounded-2xl border border-slate-200/90 bg-white/70 p-1 text-sm backdrop-blur">
+                        <nav className="flex flex-wrap items-center rounded-2xl border border-slate-200/90 bg-white/70 p-1 text-sm backdrop-blur">
                             {navItems.map((item) => (
                                 <NavLink
                                     key={item.to}
@@ -123,9 +147,11 @@ function AppRouter() {
         await loadJobs();
     }
 
+    const defaultHome = resolveHomePath(state.user);
+
     return (
         <Routes>
-            <Route path="/" element={<Navigate to="/videos/generate" replace />} />
+            <Route path="/" element={<Navigate to={defaultHome} replace />} />
 
             <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
             <Route path="/admin/login" element={<PublicOnlyRoute><AdminLoginPage /></PublicOnlyRoute>} />
@@ -161,6 +187,28 @@ function AppRouter() {
                             <LiveAvatarPage />
                         </AuthenticatedLayout>
                     </ProtectedRoute>
+                )}
+            />
+
+            <Route
+                path="/admin/roles"
+                element={(
+                    <AdminRoute requiredPermission="roles.view">
+                        <AuthenticatedLayout>
+                            <RolesAdminPage />
+                        </AuthenticatedLayout>
+                    </AdminRoute>
+                )}
+            />
+
+            <Route
+                path="/admin/permissions"
+                element={(
+                    <AdminRoute requiredPermission="permissions.view">
+                        <AuthenticatedLayout>
+                            <PermissionsAdminPage />
+                        </AuthenticatedLayout>
+                    </AdminRoute>
                 )}
             />
 

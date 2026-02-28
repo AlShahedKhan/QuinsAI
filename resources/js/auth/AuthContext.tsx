@@ -169,3 +169,44 @@ export function useAuth(): AuthContextValue {
 export function isEmailVerified(user: AuthUserDto | null): boolean {
     return user?.email_verified_at !== null && user?.email_verified_at !== undefined;
 }
+
+export function hasPermission(user: AuthUserDto | null, permission: string): boolean {
+    return user?.permissions.includes(permission) ?? false;
+}
+
+export function canAccessAdmin(user: AuthUserDto | null): boolean {
+    if (user === null) {
+        return false;
+    }
+
+    if (user.is_admin || user.roles.includes('super-admin')) {
+        return true;
+    }
+
+    return (
+        hasPermission(user, 'roles.view')
+        || hasPermission(user, 'permissions.view')
+        || hasPermission(user, 'roles.create')
+        || hasPermission(user, 'permissions.create')
+        || hasPermission(user, 'roles.update')
+        || hasPermission(user, 'permissions.update')
+        || hasPermission(user, 'roles.delete')
+        || hasPermission(user, 'permissions.delete')
+    );
+}
+
+export function getAdminLandingPath(user: AuthUserDto | null): string | null {
+    if (!canAccessAdmin(user)) {
+        return null;
+    }
+
+    if (hasPermission(user, 'roles.view')) {
+        return '/admin/roles';
+    }
+
+    if (hasPermission(user, 'permissions.view')) {
+        return '/admin/permissions';
+    }
+
+    return '/videos/generate';
+}
