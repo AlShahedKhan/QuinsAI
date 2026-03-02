@@ -2,7 +2,7 @@ import './bootstrap';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import '../css/app.css';
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, canAccessAdmin, getAdminLandingPath, hasPermission, useAuth } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { PublicOnlyRoute } from './auth/PublicOnlyRoute';
@@ -53,10 +53,8 @@ function buildAdminNavGroup(user: AuthUserDto | null): AdminNavGroup {
 }
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
-    const location = useLocation();
     const { state, logout } = useAuth();
     const adminNavGroup = React.useMemo(() => buildAdminNavGroup(state.user), [state.user]);
-    const isAdminRoute = location.pathname.startsWith('/admin');
 
     return (
         <main className="app-shell">
@@ -71,14 +69,41 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                         <h1 className="mt-1 text-2xl text-slate-900">HeyGen Operations Hub</h1>
                     </div>
 
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        <nav className="flex flex-wrap items-start gap-1 rounded-2xl border border-slate-200/90 bg-white/70 p-1 text-sm backdrop-blur">
+                    <div className="flex items-center gap-3 self-end sm:self-auto">
+                        <div className="rounded-xl border border-slate-200/90 bg-white/70 px-3 py-2 text-right backdrop-blur">
+                            <p className="text-sm font-semibold text-slate-900">{state.user?.name ?? 'User'}</p>
+                            <p className="text-xs text-slate-500">{state.user?.email}</p>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                void logout();
+                            }}
+                            className="btn-secondary"
+                        >
+                            Logout
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <section className="relative z-10 mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
+                <aside className="rounded-3xl border border-slate-200/90 bg-white/80 p-4 shadow-sm backdrop-blur lg:sticky lg:top-6">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Navigation</p>
+
+                    <div className="mt-4 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-3">
+                        <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                            Core
+                        </p>
+
+                        <div className="flex flex-col gap-1">
                             {coreNavItems.map((item) => (
                                 <NavLink
                                     key={item.to}
                                     to={item.to}
                                     className={({ isActive }) => (
-                                        `rounded-xl px-4 py-2 font-semibold transition ${isActive
+                                        `rounded-lg px-3 py-2 text-sm font-semibold transition ${isActive
                                             ? 'bg-slate-900 text-white shadow-[0_12px_22px_-12px_rgba(15,23,42,0.9)]'
                                             : 'text-slate-600 hover:bg-white hover:text-slate-900'
                                         }`
@@ -87,33 +112,10 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                                     {item.label}
                                 </NavLink>
                             ))}
-                        </nav>
-
-                        <div className="flex items-center gap-3">
-                            <div className="rounded-xl border border-slate-200/90 bg-white/70 px-3 py-2 text-right backdrop-blur">
-                                <p className="text-sm font-semibold text-slate-900">{state.user?.name ?? 'User'}</p>
-                                <p className="text-xs text-slate-500">{state.user?.email}</p>
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    void logout();
-                                }}
-                                className="btn-secondary"
-                            >
-                                Logout
-                            </button>
                         </div>
                     </div>
-                </div>
-            </header>
 
-            {isAdminRoute && adminNavGroup ? (
-                <section className="relative z-10 mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
-                    <aside className="rounded-3xl border border-slate-200/90 bg-white/80 p-4 shadow-sm backdrop-blur lg:sticky lg:top-6">
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Panel</p>
-
+                    {adminNavGroup ? (
                         <div className="mt-4 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-3">
                             <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                                 {adminNavGroup.label}
@@ -136,17 +138,13 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                                 ))}
                             </div>
                         </div>
-                    </aside>
+                    ) : null}
+                </aside>
 
-                    <div className="min-w-0">
-                        {children}
-                    </div>
-                </section>
-            ) : (
-                <section className="relative z-10 mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8">
+                <div className="min-w-0">
                     {children}
-                </section>
-            )}
+                </div>
+            </section>
         </main>
     );
 }
