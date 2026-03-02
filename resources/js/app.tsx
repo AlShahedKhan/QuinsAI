@@ -1,8 +1,8 @@
-﻿import './bootstrap';
+import './bootstrap';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import '../css/app.css';
-import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, canAccessAdmin, getAdminLandingPath, hasPermission, useAuth } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { PublicOnlyRoute } from './auth/PublicOnlyRoute';
@@ -27,29 +27,36 @@ const coreNavItems = [
     { to: '/live', label: 'Live Avatar' },
 ] as const;
 
+type NavLinkItem = { to: string; label: string };
+type AdminNavGroup = { label: string; items: NavLinkItem[] } | null;
+
 function resolveHomePath(user: AuthUserDto | null): string {
     return getAdminLandingPath(user) ?? '/videos/generate';
 }
 
-function buildNavItems(user: AuthUserDto | null): Array<{ to: string; label: string }> {
-    const items: Array<{ to: string; label: string }> = [...coreNavItems];
+function buildAdminNavGroup(user: AuthUserDto | null): AdminNavGroup {
+    const adminItems: NavLinkItem[] = [];
 
     if (canAccessAdmin(user)) {
         if (hasPermission(user, 'roles.view')) {
-            items.push({ to: '/admin/roles', label: 'Roles' });
+            adminItems.push({ to: '/admin/roles', label: 'Roles' });
         }
 
         if (hasPermission(user, 'permissions.view')) {
-            items.push({ to: '/admin/permissions', label: 'Permissions' });
+            adminItems.push({ to: '/admin/permissions', label: 'Permissions' });
         }
     }
 
-    return items;
+    return adminItems.length > 0
+        ? { label: 'Users & Roles', items: adminItems }
+        : null;
 }
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
+    const location = useLocation();
     const { state, logout } = useAuth();
-    const navItems = React.useMemo(() => buildNavItems(state.user), [state.user]);
+    const adminNavGroup = React.useMemo(() => buildAdminNavGroup(state.user), [state.user]);
+    const isAdminRoute = location.pathname.startsWith('/admin');
 
     return (
         <main className="app-shell">
@@ -65,8 +72,8 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                     </div>
 
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        <nav className="flex flex-wrap items-center rounded-2xl border border-slate-200/90 bg-white/70 p-1 text-sm backdrop-blur">
-                            {navItems.map((item) => (
+                        <nav className="flex flex-wrap items-start gap-1 rounded-2xl border border-slate-200/90 bg-white/70 p-1 text-sm backdrop-blur">
+                            {coreNavItems.map((item) => (
                                 <NavLink
                                     key={item.to}
                                     to={item.to}
@@ -102,9 +109,44 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                 </div>
             </header>
 
-            <section className="relative z-10 mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8">
-                {children}
-            </section>
+            {isAdminRoute && adminNavGroup ? (
+                <section className="relative z-10 mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start">
+                    <aside className="rounded-3xl border border-slate-200/90 bg-white/80 p-4 shadow-sm backdrop-blur lg:sticky lg:top-6">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Panel</p>
+
+                        <div className="mt-4 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-3">
+                            <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                                {adminNavGroup.label}
+                            </p>
+
+                            <div className="flex flex-col gap-1">
+                                {adminNavGroup.items.map((item) => (
+                                    <NavLink
+                                        key={item.to}
+                                        to={item.to}
+                                        className={({ isActive }) => (
+                                            `rounded-lg px-3 py-2 text-sm font-semibold transition ${isActive
+                                                ? 'bg-slate-900 text-white shadow-[0_12px_22px_-12px_rgba(15,23,42,0.9)]'
+                                                : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                                            }`
+                                        )}
+                                    >
+                                        {item.label}
+                                    </NavLink>
+                                ))}
+                            </div>
+                        </div>
+                    </aside>
+
+                    <div className="min-w-0">
+                        {children}
+                    </div>
+                </section>
+            ) : (
+                <section className="relative z-10 mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8">
+                    {children}
+                </section>
+            )}
         </main>
     );
 }
