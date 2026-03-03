@@ -1,0 +1,521 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../auth/AuthContext';
+import { FormNotice } from '../components/ui/FormNotice';
+import { heygenApi } from '../lib/heygenApi';
+import type { CatalogItem } from '../types/heygen';
+
+type AvatarTab = 'public' | 'my';
+type AvatarVisibility = AvatarTab | 'unknown';
+
+type AvatarCard = {
+    id: string;
+    name: string;
+    previewUrl: string | null;
+    visibility: AvatarVisibility;
+    looks: number | null;
+    categories: string[];
+};
+
+const DIGITAL_TWIN_DOC_URL = 'https://docs.heygen.com/reference/submit-video-avatar-creation-request';
+const PHOTO_AVATAR_DOC_URL = 'https://docs.heygen.com/reference/create-photo-avatar';
+const HEYGEN_STUDIO_AVATARS_URL = 'https://app.heygen.com/avatars';
+
+function readFirstString(item: Record<string, unknown>, keys: string[]): string | null {
+    for (const key of keys) {
+        const value = item[key];
+        if (typeof value === 'string' && value.trim() !== '') {
+            return value.trim();
+        }
+    }
+
+    return null;
+}
+
+function readFirstNumber(item: Record<string, unknown>, keys: string[]): number | null {
+    for (const key of keys) {
+        const value = item[key];
+
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            return value;
+        }
+
+        if (typeof value === 'string') {
+            const parsed = Number(value);
+            if (!Number.isNaN(parsed)) {
+                return parsed;
+            }
+        }
+    }
+
+    return null;
+}
+
+function readBoolean(item: Record<string, unknown>, keys: string[]): boolean | null {
+    for (const key of keys) {
+        const value = item[key];
+
+        if (typeof value === 'boolean') {
+            return value;
+        }
+
+        if (typeof value === 'string') {
+            const normalized = value.trim().toLowerCase();
+            if (normalized === 'true') {
+                return true;
+            }
+
+            if (normalized === 'false') {
+                return false;
+            }
+        }
+    }
+
+    return null;
+}
+
+function collectCategoryValues(item: Record<string, unknown>, keys: string[]): string[] {
+    const values: string[] = [];
+
+    for (const key of keys) {
+        const rawValue = item[key];
+
+        if (typeof rawValue === 'string' && rawValue.trim() !== '') {
+            values.push(rawValue.trim());
+            continue;
+        }
+
+        if (Array.isArray(rawValue)) {
+            for (const entry of rawValue) {
+                if (typeof entry === 'string' && entry.trim() !== '') {
+                    values.push(entry.trim());
+                }
+            }
+        }
+    }
+
+    return [...new Set(values)];
+}
+
+function resolveVisibility(item: Record<string, unknown>, currentUserId: number | null): AvatarVisibility {
+    const explicitPublic = readBoolean(item, ['is_public', 'public', 'isPublic']);
+    if (explicitPublic !== null) {
+        return explicitPublic ? 'public' : 'my';
+    }
+
+    const visibility = readFirstString(item, ['visibility', 'scope', 'type']);
+    if (visibility !== null) {
+        const normalized = visibility.toLowerCase();
+        if (normalized.includes('public')) {
+            return 'public';
+        }
+
+        if (normalized.includes('private') || normalized.includes('my')) {
+            return 'my';
+        }
+    }
+
+    if (currentUserId !== null) {
+        const ownerId = readFirstNumber(item, ['user_id', 'owner_id', 'creator_id', 'created_by']);
+        if (ownerId !== null) {
+            return ownerId === currentUserId ? 'my' : 'public';
+        }
+    }
+
+    return 'unknown';
+}
+
+function normalizeAvatar(item: CatalogItem, currentUserId: number | null): AvatarCard | null {
+    const raw = item as Record<string, unknown>;
+
+    const id = readFirstString(raw, ['avatar_id', 'id', 'name']);
+    if (id === null) {
+        return null;
+    }
+
+    const name = readFirstString(raw, ['display_name', 'name', 'avatar_name', 'avatar_id', 'id']) ?? id;
+    const previewUrl = readFirstString(raw, [
+        'preview_image_url',
+        'preview_url',
+        'thumbnail_url',
+        'avatar_image_url',
+        'image_url',
+        'photo_url',
+        'cover_url',
+    ]);
+
+    const looks = readFirstNumber(raw, ['looks', 'looks_count', 'look_count']);
+
+    const categories = collectCategoryValues(raw, [
+        'category',
+        'categories',
+        'avatar_type',
+        'type',
+        'style',
+        'tags',
+        'gender',
+    ]);
+
+    return {
+        id,
+        name,
+        previewUrl,
+        looks,
+        categories,
+        visibility: resolveVisibility(raw, currentUserId),
+    };
+}
+
+function resolveInitials(name: string): string {
+    const parts = name
+        .split(/\s+/)
+        .map((part) => part.trim())
+        .filter((part) => part !== '');
+
+    if (parts.length === 0) {
+        return 'AV';
+    }
+
+    if (parts.length === 1) {
+        return parts[0].slice(0, 2).toUpperCase();
+    }
+
+    return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
+}
+
+export function AvatarsPage() {
+    const { state } = useAuth();
+    const [avatars, setAvatars] = useState<AvatarCard[]>([]);
+    const [activeTab, setActiveTab] = useState<AvatarTab>('public');
+    const [activeCategory, setActiveCategory] = useState('All');
+    const [query, setQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const currentUserId = state.user?.id ?? null;
+
+    const loadCatalog = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const catalog = await heygenApi.getCatalog();
+            const normalized = catalog.avatars
+                .map((item) => normalizeAvatar(item, currentUserId))
+                .filter((item): item is AvatarCard => item !== null);
+            setAvatars(normalized);
+        } catch (err) {
+            const normalizedError = err instanceof Error ? err : new Error('Failed to load avatars.');
+            setError(normalizedError.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [currentUserId]);
+
+    useEffect(() => {
+        void loadCatalog();
+    }, [loadCatalog]);
+
+    const hasVisibilitySignals = useMemo(
+        () => avatars.some((avatar) => avatar.visibility !== 'unknown'),
+        [avatars],
+    );
+
+    const counts = useMemo(() => {
+        if (!hasVisibilitySignals) {
+            return {
+                public: avatars.length,
+                my: 0,
+            };
+        }
+
+        return {
+            public: avatars.filter((avatar) => avatar.visibility === 'public').length,
+            my: avatars.filter((avatar) => avatar.visibility === 'my').length,
+        };
+    }, [avatars, hasVisibilitySignals]);
+
+    const tabFiltered = useMemo(() => {
+        if (!hasVisibilitySignals) {
+            return activeTab === 'public' ? avatars : [];
+        }
+
+        return avatars.filter((avatar) => avatar.visibility === activeTab);
+    }, [avatars, activeTab, hasVisibilitySignals]);
+
+    const availableCategories = useMemo(() => {
+        const set = new Set<string>();
+        for (const avatar of tabFiltered) {
+            for (const category of avatar.categories) {
+                set.add(category);
+            }
+        }
+
+        return ['All', ...Array.from(set).sort((a, b) => a.localeCompare(b))];
+    }, [tabFiltered]);
+
+    useEffect(() => {
+        if (!availableCategories.includes(activeCategory)) {
+            setActiveCategory('All');
+        }
+    }, [availableCategories, activeCategory]);
+
+    const filteredAvatars = useMemo(() => {
+        const normalizedQuery = query.trim().toLowerCase();
+
+        return tabFiltered.filter((avatar) => {
+            const inCategory = activeCategory === 'All' || avatar.categories.includes(activeCategory);
+            if (!inCategory) {
+                return false;
+            }
+
+            if (normalizedQuery === '') {
+                return true;
+            }
+
+            const haystack = [
+                avatar.name,
+                avatar.id,
+                ...avatar.categories,
+            ].join(' ').toLowerCase();
+
+            return haystack.includes(normalizedQuery);
+        });
+    }, [tabFiltered, activeCategory, query]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [activeTab, activeCategory, query]);
+
+    const pageSize = activeTab === 'public' ? 50 : Math.max(filteredAvatars.length, 1);
+    const totalPages = Math.max(1, Math.ceil(filteredAvatars.length / pageSize));
+
+    useEffect(() => {
+        if (currentPage > totalPages) {
+            setCurrentPage(totalPages);
+        }
+    }, [currentPage, totalPages]);
+
+    const paginatedAvatars = useMemo(() => {
+        if (activeTab !== 'public') {
+            return filteredAvatars;
+        }
+
+        const start = (currentPage - 1) * pageSize;
+        return filteredAvatars.slice(start, start + pageSize);
+    }, [activeTab, currentPage, filteredAvatars, pageSize]);
+
+    const pageStart = filteredAvatars.length === 0
+        ? 0
+        : ((currentPage - 1) * pageSize) + 1;
+    const pageEnd = Math.min(currentPage * pageSize, filteredAvatars.length);
+
+    return (
+        <section className="grid gap-6">
+            <article className="surface-card page-enter p-6 sm:p-7">
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Avatar Gallery</p>
+                        <h2 className="mt-1 text-2xl text-slate-900">Browse and Use HeyGen Avatars</h2>
+                        <p className="mt-2 text-sm text-slate-600">
+                            Explore available avatars, filter by category, and pick one for your video or live workflow.
+                        </p>
+                    </div>
+
+                    <button type="button" onClick={() => void loadCatalog()} className="btn-secondary">
+                        Refresh
+                    </button>
+                </div>
+
+                <div className="mt-6 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                    <label className="relative block">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M21 21L16.65 16.65M18 10.5C18 14.6421 14.6421 18 10.5 18C6.35786 18 3 14.6421 3 10.5C3 6.35786 6.35786 3 10.5 3C14.6421 3 18 6.35786 18 10.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                            </svg>
+                        </span>
+                        <input
+                            type="search"
+                            className="text-field !pl-10"
+                            placeholder="Search avatars by name, ID, or style..."
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                        />
+                    </label>
+
+                    <div className="inline-flex rounded-xl border border-slate-200/90 bg-slate-50 p-1">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('my')}
+                            className={activeTab === 'my'
+                                ? 'rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm'
+                                : 'rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 hover:text-slate-800'}
+                        >
+                            My Avatars ({counts.my})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('public')}
+                            className={activeTab === 'public'
+                                ? 'rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm'
+                                : 'rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 hover:text-slate-800'}
+                        >
+                            Public Avatars ({counts.public})
+                        </button>
+                    </div>
+                </div>
+
+                {availableCategories.length > 1 ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                        {availableCategories.map((category) => (
+                            <button
+                                key={category}
+                                type="button"
+                                onClick={() => setActiveCategory(category)}
+                                className={activeCategory === category
+                                    ? 'rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700'
+                                    : 'rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900'}
+                            >
+                                {category}
+                            </button>
+                        ))}
+                    </div>
+                ) : null}
+
+                <div className="mt-5 space-y-3">
+                    {error && <FormNotice tone="error">{error}</FormNotice>}
+                </div>
+
+                {loading ? (
+                    <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                        {Array.from({ length: 8 }).map((_, index) => (
+                            <div
+                                key={`avatar-skeleton-${index}`}
+                                className="aspect-[3/4] animate-pulse rounded-2xl border border-slate-200/90 bg-slate-100"
+                            />
+                        ))}
+                    </div>
+                ) : filteredAvatars.length === 0 ? (
+                    <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-10 text-center">
+                        <p className="text-sm font-semibold text-slate-900">No avatars found</p>
+                        <p className="mt-1 text-sm text-slate-600">
+                            Try changing the tab, clearing filters, or create one with HeyGen below.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                        {paginatedAvatars.map((avatar) => (
+                            <article key={avatar.id} className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-100 shadow-sm">
+                                <div className="relative aspect-[3/4]">
+                                    {avatar.previewUrl ? (
+                                        <img
+                                            src={avatar.previewUrl}
+                                            alt={avatar.name}
+                                            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                                            loading="lazy"
+                                        />
+                                    ) : (
+                                        <div className="grid h-full w-full place-items-center bg-[linear-gradient(135deg,#cbd5e1_0%,#e2e8f0_45%,#f1f5f9_100%)]">
+                                            <span className="rounded-xl bg-white/70 px-4 py-3 text-lg font-extrabold tracking-[0.08em] text-slate-700">
+                                                {resolveInitials(avatar.name)}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/84 via-slate-900/28 to-transparent p-4 text-white">
+                                        <p className="text-base font-semibold">{avatar.name}</p>
+                                        <p className="mt-1 font-mono text-[11px] text-slate-200/95">{avatar.id}</p>
+                                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                                            {avatar.looks !== null ? (
+                                                <span className="rounded-full bg-white/18 px-2 py-1 text-[11px] font-semibold">
+                                                    {avatar.looks} looks
+                                                </span>
+                                            ) : null}
+                                            {avatar.categories.slice(0, 2).map((category) => (
+                                                <span key={`${avatar.id}-${category}`} className="rounded-full bg-white/18 px-2 py-1 text-[11px] font-semibold">
+                                                    {category}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                )}
+
+                {activeTab === 'public' && filteredAvatars.length > 50 ? (
+                    <div className="mt-5 flex flex-col gap-3 border-t border-slate-200/90 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-slate-600">
+                            Showing <span className="font-semibold text-slate-900">{pageStart}</span>-
+                            <span className="font-semibold text-slate-900">{pageEnd}</span> of{' '}
+                            <span className="font-semibold text-slate-900">{filteredAvatars.length}</span> public avatars
+                        </p>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                className="btn-secondary !min-h-9 !rounded-lg !px-3 !py-1.5 !text-sm"
+                                disabled={currentPage === 1}
+                                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                            >
+                                Previous
+                            </button>
+                            <span className="px-1 text-sm font-semibold text-slate-700">
+                                Page {currentPage} / {totalPages}
+                            </span>
+                            <button
+                                type="button"
+                                className="btn-secondary !min-h-9 !rounded-lg !px-3 !py-1.5 !text-sm"
+                                disabled={currentPage === totalPages}
+                                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                ) : null}
+            </article>
+
+            <article className="surface-card page-enter stagger-1 p-6 sm:p-7">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Create Avatar</p>
+                <h3 className="mt-1 text-2xl text-slate-900">Create Your First Avatar</h3>
+                <p className="mt-2 text-sm text-slate-600">
+                    For person-based avatars, HeyGen requires onboarding and verification in their official flow. Use these shortcuts, then refresh this page.
+                </p>
+
+                <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                    <article className="rounded-2xl border border-slate-200/90 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_100%)] p-5">
+                        <h4 className="text-lg font-semibold text-slate-900">Clone a real person</h4>
+                        <p className="mt-2 text-sm text-slate-600">
+                            Start HeyGen Digital Twin flow with training footage and consent video.
+                        </p>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            <a className="btn-primary" href={HEYGEN_STUDIO_AVATARS_URL} target="_blank" rel="noreferrer">
+                                Open HeyGen Studio
+                            </a>
+                            <a className="btn-secondary" href={DIGITAL_TWIN_DOC_URL} target="_blank" rel="noreferrer">
+                                API Docs
+                            </a>
+                        </div>
+                    </article>
+
+                    <article className="rounded-2xl border border-slate-200/90 bg-[linear-gradient(145deg,#f0f9ff_0%,#dbeafe_100%)] p-5">
+                        <h4 className="text-lg font-semibold text-slate-900">Create a virtual character</h4>
+                        <p className="mt-2 text-sm text-slate-600">
+                            Use HeyGen Photo Avatar APIs to generate and train a custom avatar.
+                        </p>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            <a className="btn-secondary" href={PHOTO_AVATAR_DOC_URL} target="_blank" rel="noreferrer">
+                                Photo Avatar Docs
+                            </a>
+                            <button type="button" className="btn-secondary" onClick={() => void loadCatalog()}>
+                                I created one, refresh list
+                            </button>
+                        </div>
+                    </article>
+                </div>
+            </article>
+        </section>
+    );
+}

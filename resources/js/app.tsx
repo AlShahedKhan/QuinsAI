@@ -12,6 +12,7 @@ import { useVideoPolling } from './hooks/useVideoPolling';
 import { VideoGeneratorPage } from './pages/VideoGeneratorPage';
 import { VideoHistoryPage } from './pages/VideoHistoryPage';
 import { LiveAvatarPage } from './pages/LiveAvatarPage';
+import { AvatarsPage } from './pages/AvatarsPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { AdminLoginPage } from './pages/auth/AdminLoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
@@ -22,6 +23,7 @@ import { PermissionsAdminPage } from './pages/admin/PermissionsAdminPage';
 import type { AuthUserDto, VideoJobDto } from './types/heygen';
 
 const coreNavItems = [
+    { to: '/avatars', label: 'Avatars' },
     { to: '/videos/generate', label: 'Generate' },
     { to: '/videos', label: 'History' },
     { to: '/live', label: 'Live Avatar' },
@@ -199,6 +201,16 @@ function AppRouter() {
             <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPasswordPage /></PublicOnlyRoute>} />
             <Route path="/reset-password/:token" element={<PublicOnlyRoute><ResetPasswordPage /></PublicOnlyRoute>} />
 
+            <Route
+                path="/avatars"
+                element={(
+                    <ProtectedRoute>
+                        <AuthenticatedLayout>
+                            <AvatarsPage />
+                        </AuthenticatedLayout>
+                    </ProtectedRoute>
+                )}
+            />
             <Route
                 path="/videos/generate"
                 element={(
