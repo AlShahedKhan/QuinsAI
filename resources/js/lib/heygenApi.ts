@@ -1,5 +1,5 @@
 import { apiClient, toApiError } from './apiClient';
-import type { CatalogDto, LiveSessionDto, Paginated, VideoJobDto } from '../types/heygen';
+import type { CatalogDto, DigitalTwinDto, LiveSessionDto, Paginated, VideoJobDto } from '../types/heygen';
 
 type CreateVideoInput = {
     avatar_id: string;
@@ -27,6 +27,41 @@ export const heygenApi = {
         try {
             const response = await apiClient.post<{ data: VideoJobDto; quota: Record<string, number> }>('/api/heygen/videos', input);
             return response.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
+    async createDigitalTwin(input: FormData): Promise<{ data: DigitalTwinDto; quota: Record<string, number> }> {
+        try {
+            const response = await apiClient.post<{ data: DigitalTwinDto; quota: Record<string, number> }>(
+                '/api/heygen/digital-twins',
+                input,
+                {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                },
+            );
+            return response.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
+    async listDigitalTwins(page = 1): Promise<Paginated<DigitalTwinDto>> {
+        try {
+            const response = await apiClient.get<Paginated<DigitalTwinDto>>('/api/heygen/digital-twins', { params: { page } });
+            return response.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
+    async getDigitalTwin(id: number): Promise<DigitalTwinDto> {
+        try {
+            const response = await apiClient.get<{ data: DigitalTwinDto }>(`/api/heygen/digital-twins/${id}`);
+            return response.data.data;
         } catch (error) {
             throw toApiError(error);
         }

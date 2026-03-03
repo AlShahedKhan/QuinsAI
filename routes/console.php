@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ReconcileStaleHeyGenDigitalTwinsJob;
 use App\Jobs\ReconcileStaleHeyGenJobsJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -14,4 +15,10 @@ Artisan::command('heygen:reconcile', function () {
     $this->info('Queued stale HeyGen job reconciliation.');
 })->purpose('Queue reconciliation for non-terminal HeyGen video jobs.');
 
+Artisan::command('heygen:digital-twins:reconcile', function () {
+    ReconcileStaleHeyGenDigitalTwinsJob::dispatch();
+    $this->info('Queued stale HeyGen digital twin reconciliation.');
+})->purpose('Queue reconciliation for non-terminal HeyGen digital twin jobs.');
+
 Schedule::job(new ReconcileStaleHeyGenJobsJob())->everyMinute();
+Schedule::job(new ReconcileStaleHeyGenDigitalTwinsJob())->everyMinute();

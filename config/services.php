@@ -48,10 +48,16 @@ return [
             explode(',', (string) env('HEYGEN_SCRIPT_BLOCKLIST', ''))
         ))),
         'daily_request_limit' => (int) env('HEYGEN_DAILY_REQUEST_LIMIT', 5),
+        'digital_twin_daily_request_limit' => (int) env('HEYGEN_DIGITAL_TWIN_DAILY_REQUEST_LIMIT', 1),
         'daily_live_minute_limit' => (int) env('HEYGEN_DAILY_LIVE_MINUTE_LIMIT', 30),
         'storage_disk' => env('HEYGEN_STORAGE_DISK', env('FILESYSTEM_DISK', 'local')),
         'storage_prefix' => env('HEYGEN_STORAGE_PREFIX', 'heygen/videos'),
         'reconcile_after_minutes' => (int) env('HEYGEN_RECONCILE_AFTER_MINUTES', 3),
+        'digital_twin_upload_disk' => env('HEYGEN_DIGITAL_TWIN_UPLOAD_DISK', env('FILESYSTEM_DISK', 'local')),
+        'digital_twin_upload_prefix' => env('HEYGEN_DIGITAL_TWIN_UPLOAD_PREFIX', 'heygen/digital-twins'),
+        'digital_twin_media_ttl_minutes' => (int) env('HEYGEN_DIGITAL_TWIN_MEDIA_TTL_MINUTES', 1440),
+        'digital_twin_reconcile_after_minutes' => (int) env('HEYGEN_DIGITAL_TWIN_RECONCILE_AFTER_MINUTES', 5),
+        'digital_twin_max_upload_mb' => (int) env('HEYGEN_DIGITAL_TWIN_MAX_UPLOAD_MB', 250),
     ],
 
 ];

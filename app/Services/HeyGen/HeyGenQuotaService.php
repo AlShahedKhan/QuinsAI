@@ -32,6 +32,22 @@ class HeyGenQuotaService
         });
     }
 
+    public function consumeDigitalTwinRequest(User $user): HeyGenUsageDaily
+    {
+        return DB::transaction(function () use ($user): HeyGenUsageDaily {
+            $record = $this->resolveRecordForUpdate($user);
+
+            if ($record->digital_twin_requests >= $record->daily_digital_twin_limit) {
+                throw new HeyGenQuotaException('Daily HeyGen digital twin request quota reached.');
+            }
+
+            $record->increment('digital_twin_requests');
+            $record->refresh();
+
+            return $record;
+        });
+    }
+
     public function recordLiveMinutes(User $user, int $minutes): HeyGenUsageDaily
     {
         return DB::transaction(function () use ($user, $minutes): HeyGenUsageDaily {
@@ -57,6 +73,20 @@ class HeyGenQuotaService
         return max(0, $record->daily_request_limit - $record->video_requests);
     }
 
+    public function remainingDigitalTwinRequests(User $user): int
+    {
+        $record = HeyGenUsageDaily::query()
+            ->where('user_id', $user->id)
+            ->whereDate('usage_date', now()->toDateString())
+            ->first();
+
+        if ($record === null) {
+            return (int) config('services.heygen.digital_twin_daily_request_limit', 1);
+        }
+
+        return max(0, $record->daily_digital_twin_limit - $record->digital_twin_requests);
+    }
+
     private function resolveRecordForUpdate(User $user): HeyGenUsageDaily
     {
         $today = CarbonImmutable::today()->toDateString();
@@ -75,6 +105,7 @@ class HeyGenQuotaService
             'user_id' => $user->id,
             'usage_date' => $today,
             'daily_request_limit' => (int) config('services.heygen.daily_request_limit', 5),
+            'daily_digital_twin_limit' => (int) config('services.heygen.digital_twin_daily_request_limit', 1),
             'daily_minute_limit' => (int) config('services.heygen.daily_live_minute_limit', 30),
         ]);
     }

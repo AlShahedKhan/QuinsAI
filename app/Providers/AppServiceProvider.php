@@ -34,6 +34,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(240)->by($request->ip());
         });
 
+        RateLimiter::for('heygen-public-media', function (Request $request): Limit {
+            return Limit::perMinute(180)->by($request->ip());
+        });
+
         RateLimiter::for('auth-register', function (Request $request): Limit {
             return Limit::perMinute(5)->by($request->ip());
         });

@@ -41,6 +41,31 @@ class HeyGenClient
     }
 
     /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createDigitalTwin(array $payload): array
+    {
+        return $this->request('post', '/v2/video_avatar', $payload);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getDigitalTwinStatus(string $providerAvatarId): array
+    {
+        return $this->request('get', '/v2/video_avatar/'.rawurlencode($providerAvatarId));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function deleteDigitalTwin(string $providerAvatarId): array
+    {
+        return $this->request('delete', '/v2/video_avatar/'.rawurlencode($providerAvatarId));
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function createStreamingToken(string $userIdentifier): array
@@ -84,6 +109,7 @@ class HeyGenClient
         $response = match (strtolower($method)) {
             'get' => $this->baseRequest($apiKey)->get($uri, $payload),
             'post' => $this->baseRequest($apiKey)->post($uri, $payload),
+            'delete' => $this->baseRequest($apiKey)->delete($uri, $payload),
             default => throw new HeyGenException("Unsupported HeyGen method [$method].", 500),
         };
 

@@ -69,6 +69,14 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<HeyGenDigitalTwin, $this>
+     */
+    public function heygenDigitalTwins(): HasMany
+    {
+        return $this->hasMany(HeyGenDigitalTwin::class);
+    }
+
+    /**
      * @return HasMany<AuthRefreshToken, $this>
      */
     public function refreshTokens(): HasMany

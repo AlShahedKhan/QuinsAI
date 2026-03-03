@@ -19,9 +19,11 @@ class HeyGenUsageDaily extends Model
         'user_id',
         'usage_date',
         'video_requests',
+        'digital_twin_requests',
         'live_session_minutes',
         'cost_units',
         'daily_request_limit',
+        'daily_digital_twin_limit',
         'daily_minute_limit',
         'blocked_until',
     ];

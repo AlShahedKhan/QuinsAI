@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\PasswordController;
 use App\Http\Controllers\Api\Auth\VerificationController;
 use App\Http\Controllers\Api\HeyGen\CatalogController;
+use App\Http\Controllers\Api\HeyGen\DigitalTwinController;
+use App\Http\Controllers\Api\HeyGen\DigitalTwinMediaController;
 use App\Http\Controllers\Api\HeyGen\LiveSessionController;
 use App\Http\Controllers\Api\HeyGen\VideoController;
 use App\Http\Controllers\Api\HeyGen\WebhookController;
@@ -44,6 +46,10 @@ Route::middleware(['auth:sanctum', 'throttle:heygen-read'])->prefix('heygen')->g
     Route::get('/videos/{videoJob}', [VideoController::class, 'show']);
     Route::post('/videos', [VideoController::class, 'store'])->middleware('throttle:heygen-write');
 
+    Route::get('/digital-twins', [DigitalTwinController::class, 'index']);
+    Route::get('/digital-twins/{digitalTwin}', [DigitalTwinController::class, 'show']);
+    Route::post('/digital-twins', [DigitalTwinController::class, 'store'])->middleware('throttle:heygen-write');
+
     Route::post('/live/sessions', [LiveSessionController::class, 'store'])->middleware('throttle:heygen-write');
     Route::post('/live/sessions/{liveSession}/end', [LiveSessionController::class, 'end'])->middleware('throttle:heygen-write');
 });
@@ -65,3 +71,8 @@ Route::middleware(['auth:sanctum', 'throttle:admin-security'])->prefix('admin')-
 });
 
 Route::post('/webhooks/heygen', WebhookController::class)->middleware('throttle:heygen-webhook');
+
+Route::get('/heygen/digital-twins/media/{digitalTwin}/{kind}', DigitalTwinMediaController::class)
+    ->middleware(['signed', 'throttle:heygen-public-media'])
+    ->whereIn('kind', ['training', 'consent'])
+    ->name('heygen.digital-twins.media');

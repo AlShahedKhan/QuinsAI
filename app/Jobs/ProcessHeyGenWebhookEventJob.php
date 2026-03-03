@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Domain\HeyGen\HeyGenDigitalTwinWorkflowService;
 use App\Domain\HeyGen\HeyGenVideoWorkflowService;
+use App\Models\HeyGenDigitalTwin;
 use App\Models\HeyGenVideoJob;
 use App\Models\HeyGenWebhookEvent;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -23,7 +25,10 @@ class ProcessHeyGenWebhookEventJob implements ShouldQueue
     ) {
     }
 
-    public function handle(HeyGenVideoWorkflowService $workflowService): void
+    public function handle(
+        HeyGenVideoWorkflowService $workflowService,
+        HeyGenDigitalTwinWorkflowService $digitalTwinWorkflowService,
+    ): void
     {
         $event = HeyGenWebhookEvent::query()->find($this->webhookEventId);
         if ($event === null || ! $event->signature_valid) {
@@ -39,27 +44,55 @@ class ProcessHeyGenWebhookEventJob implements ShouldQueue
                 ?? ''
             );
 
-            if ($videoId === '') {
+            if ($videoId !== '') {
+                $videoJob = HeyGenVideoJob::query()
+                    ->where('provider_video_id', $videoId)
+                    ->first();
+
+                if ($videoJob === null) {
+                    $event->processed_at = now();
+                    $event->processing_error = 'Video job not found for provider video ID.';
+                    $event->save();
+
+                    return;
+                }
+
+                $workflowService->applyProviderStatus($videoJob, $payload);
                 $event->processed_at = now();
-                $event->processing_error = 'Missing provider video ID in webhook payload.';
+                $event->processing_error = null;
                 $event->save();
 
                 return;
             }
 
-            $videoJob = HeyGenVideoJob::query()
-                ->where('provider_video_id', $videoId)
+            $avatarId = (string) (
+                Arr::get($payload, 'data.avatar_id')
+                ?? Arr::get($payload, 'avatar_id')
+                ?? Arr::get($payload, 'data.id')
+                ?? ''
+            );
+
+            if ($avatarId === '') {
+                $event->processed_at = now();
+                $event->processing_error = 'Missing provider identifiers in webhook payload.';
+                $event->save();
+
+                return;
+            }
+
+            $digitalTwin = HeyGenDigitalTwin::query()
+                ->where('provider_avatar_id', $avatarId)
                 ->first();
 
-            if ($videoJob === null) {
+            if ($digitalTwin === null) {
                 $event->processed_at = now();
-                $event->processing_error = 'Video job not found for provider video ID.';
+                $event->processing_error = 'Digital twin job not found for provider avatar ID.';
                 $event->save();
 
                 return;
             }
 
-            $workflowService->applyProviderStatus($videoJob, $payload);
+            $digitalTwinWorkflowService->applyProviderStatus($digitalTwin, $payload);
             $event->processed_at = now();
             $event->processing_error = null;
             $event->save();

@@ -1,6 +1,7 @@
 export type VideoJobStatus = 'queued' | 'submitting' | 'processing' | 'completed' | 'failed';
 
 export type LiveSessionStatus = 'created' | 'active' | 'ended' | 'failed';
+export type DigitalTwinStatus = 'queued' | 'submitting' | 'processing' | 'completed' | 'failed';
 
 export type VideoJobDto = {
     id: number;
@@ -32,6 +33,23 @@ export type LiveSessionDto = {
     token_expires_at: string | null;
     started_at: string | null;
     ended_at: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+};
+
+export type DigitalTwinDto = {
+    id: number;
+    avatar_name: string;
+    status: DigitalTwinStatus;
+    provider_avatar_id: string | null;
+    provider_avatar_group_id: string | null;
+    error_code: string | null;
+    error_message: string | null;
+    preview_image_url: string | null;
+    preview_video_url: string | null;
+    submitted_at: string | null;
+    completed_at: string | null;
+    failed_at: string | null;
     created_at: string | null;
     updated_at: string | null;
 };

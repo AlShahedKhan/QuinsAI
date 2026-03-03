@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { FormNotice } from '../components/ui/FormNotice';
 import { heygenApi } from '../lib/heygenApi';
-import type { CatalogItem } from '../types/heygen';
+import type { CatalogItem, DigitalTwinDto, DigitalTwinStatus } from '../types/heygen';
 
 type AvatarTab = 'public' | 'my';
 type AvatarVisibility = AvatarTab | 'unknown';
@@ -19,6 +19,7 @@ type AvatarCard = {
 const DIGITAL_TWIN_DOC_URL = 'https://docs.heygen.com/reference/submit-video-avatar-creation-request';
 const PHOTO_AVATAR_DOC_URL = 'https://docs.heygen.com/reference/create-photo-avatar';
 const HEYGEN_STUDIO_AVATARS_URL = 'https://app.heygen.com/avatars';
+const TERMINAL_DIGITAL_TWIN_STATUSES = new Set<DigitalTwinStatus>(['completed', 'failed']);
 
 function readFirstString(item: Record<string, unknown>, keys: string[]): string | null {
     for (const key of keys) {
@@ -182,6 +183,31 @@ function resolveInitials(name: string): string {
     return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
 }
 
+function formatDateTime(value: string | null): string {
+    if (!value) {
+        return 'N/A';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return 'N/A';
+    }
+
+    return date.toLocaleString();
+}
+
+function resolveDigitalTwinBadgeClass(status: DigitalTwinStatus): string {
+    if (status === 'completed') {
+        return 'status-badge status-completed';
+    }
+
+    if (status === 'failed') {
+        return 'status-badge status-failed';
+    }
+
+    return 'status-badge status-default';
+}
+
 export function AvatarsPage() {
     const { state } = useAuth();
     const [avatars, setAvatars] = useState<AvatarCard[]>([]);
@@ -191,6 +217,16 @@ export function AvatarsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [digitalTwins, setDigitalTwins] = useState<DigitalTwinDto[]>([]);
+    const [digitalTwinLoading, setDigitalTwinLoading] = useState(false);
+    const [digitalTwinError, setDigitalTwinError] = useState<string | null>(null);
+    const [digitalTwinNotice, setDigitalTwinNotice] = useState<string | null>(null);
+    const [digitalTwinQuotaRemaining, setDigitalTwinQuotaRemaining] = useState<number | null>(null);
+    const [avatarName, setAvatarName] = useState('');
+    const [trainingFootage, setTrainingFootage] = useState<File | null>(null);
+    const [consentVideo, setConsentVideo] = useState<File | null>(null);
+    const [submittingTwin, setSubmittingTwin] = useState(false);
+    const [uploadInputKey, setUploadInputKey] = useState(0);
 
     const currentUserId = state.user?.id ?? null;
 
@@ -212,9 +248,38 @@ export function AvatarsPage() {
         }
     }, [currentUserId]);
 
+    const loadDigitalTwins = useCallback(async () => {
+        setDigitalTwinLoading(true);
+        setDigitalTwinError(null);
+
+        try {
+            const response = await heygenApi.listDigitalTwins(1);
+            setDigitalTwins(response.data);
+        } catch (err) {
+            const normalizedError = err instanceof Error ? err : new Error('Failed to load digital twin requests.');
+            setDigitalTwinError(normalizedError.message);
+        } finally {
+            setDigitalTwinLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
-        void loadCatalog();
-    }, [loadCatalog]);
+        void Promise.all([loadCatalog(), loadDigitalTwins()]);
+    }, [loadCatalog, loadDigitalTwins]);
+
+    useEffect(() => {
+        if (!digitalTwins.some((item) => !TERMINAL_DIGITAL_TWIN_STATUSES.has(item.status))) {
+            return;
+        }
+
+        const intervalId = window.setInterval(() => {
+            void loadDigitalTwins();
+        }, 15000);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, [digitalTwins, loadDigitalTwins]);
 
     const hasVisibilitySignals = useMemo(
         () => avatars.some((avatar) => avatar.visibility !== 'unknown'),
@@ -309,6 +374,49 @@ export function AvatarsPage() {
         ? 0
         : ((currentPage - 1) * pageSize) + 1;
     const pageEnd = Math.min(currentPage * pageSize, filteredAvatars.length);
+
+    const canSubmitDigitalTwin = useMemo(() => (
+        !submittingTwin
+        && avatarName.trim() !== ''
+        && trainingFootage !== null
+        && consentVideo !== null
+    ), [submittingTwin, avatarName, trainingFootage, consentVideo]);
+
+    async function handleDigitalTwinSubmit(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        if (!canSubmitDigitalTwin) {
+            return;
+        }
+
+        setSubmittingTwin(true);
+        setDigitalTwinError(null);
+        setDigitalTwinNotice(null);
+
+        try {
+            const formData = new FormData();
+            formData.append('avatar_name', avatarName.trim());
+            formData.append('training_footage', trainingFootage as Blob, trainingFootage?.name);
+            formData.append('video_consent', consentVideo as Blob, consentVideo?.name);
+
+            const response = await heygenApi.createDigitalTwin(formData);
+            setDigitalTwinNotice(`Digital twin request #${response.data.id} submitted successfully.`);
+
+            const remaining = response.quota.digital_twin_requests_remaining;
+            setDigitalTwinQuotaRemaining(typeof remaining === 'number' ? remaining : null);
+
+            setAvatarName('');
+            setTrainingFootage(null);
+            setConsentVideo(null);
+            setUploadInputKey((value) => value + 1);
+
+            await loadDigitalTwins();
+        } catch (err) {
+            const normalizedError = err instanceof Error ? err : new Error('Failed to submit digital twin request.');
+            setDigitalTwinError(normalizedError.message);
+        } finally {
+            setSubmittingTwin(false);
+        }
+    }
 
     return (
         <section className="grid gap-6">
@@ -481,39 +589,153 @@ export function AvatarsPage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Create Avatar</p>
                 <h3 className="mt-1 text-2xl text-slate-900">Create Your First Avatar</h3>
                 <p className="mt-2 text-sm text-slate-600">
-                    For person-based avatars, HeyGen requires onboarding and verification in their official flow. Use these shortcuts, then refresh this page.
+                    This form submits Digital Twin requests directly from your app. HeyGen Enterprise access is still required on the provider side.
                 </p>
 
                 <div className="mt-6 grid gap-4 lg:grid-cols-2">
                     <article className="rounded-2xl border border-slate-200/90 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_100%)] p-5">
-                        <h4 className="text-lg font-semibold text-slate-900">Clone a real person</h4>
+                        <h4 className="text-lg font-semibold text-slate-900">Clone a real person (In-App)</h4>
                         <p className="mt-2 text-sm text-slate-600">
-                            Start HeyGen Digital Twin flow with training footage and consent video.
+                            Upload training and consent MP4 files, then submit to the backend Digital Twin pipeline.
                         </p>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                            <a className="btn-primary" href={HEYGEN_STUDIO_AVATARS_URL} target="_blank" rel="noreferrer">
-                                Open HeyGen Studio
-                            </a>
-                            <a className="btn-secondary" href={DIGITAL_TWIN_DOC_URL} target="_blank" rel="noreferrer">
-                                API Docs
-                            </a>
+
+                        <form className="mt-4 grid gap-4" onSubmit={handleDigitalTwinSubmit}>
+                            <div>
+                                <label className="field-label" htmlFor="digital-twin-name">Avatar Name</label>
+                                <input
+                                    id="digital-twin-name"
+                                    className="text-field"
+                                    value={avatarName}
+                                    onChange={(event) => setAvatarName(event.target.value)}
+                                    placeholder="e.g. Abdullah Digital Twin"
+                                    maxLength={120}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="field-label" htmlFor="digital-twin-training">Training Footage (MP4)</label>
+                                <input
+                                    key={`training-${uploadInputKey}`}
+                                    id="digital-twin-training"
+                                    type="file"
+                                    className="text-field !py-2"
+                                    accept="video/mp4"
+                                    onChange={(event) => setTrainingFootage(event.target.files?.[0] ?? null)}
+                                    required
+                                />
+                                <p className="mt-1 text-xs text-slate-500">Use a clear frontal face video, 30+ seconds recommended.</p>
+                            </div>
+
+                            <div>
+                                <label className="field-label" htmlFor="digital-twin-consent">Consent Video (MP4)</label>
+                                <input
+                                    key={`consent-${uploadInputKey}`}
+                                    id="digital-twin-consent"
+                                    type="file"
+                                    className="text-field !py-2"
+                                    accept="video/mp4"
+                                    onChange={(event) => setConsentVideo(event.target.files?.[0] ?? null)}
+                                    required
+                                />
+                                <p className="mt-1 text-xs text-slate-500">Consent clip must satisfy HeyGen identity and permission policy.</p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                                <button type="submit" className="btn-primary" disabled={!canSubmitDigitalTwin}>
+                                    {submittingTwin ? 'Submitting...' : 'Submit Digital Twin'}
+                                </button>
+                                <a className="btn-secondary" href={DIGITAL_TWIN_DOC_URL} target="_blank" rel="noreferrer">
+                                    API Docs
+                                </a>
+                                <a className="btn-secondary" href={HEYGEN_STUDIO_AVATARS_URL} target="_blank" rel="noreferrer">
+                                    Open Studio
+                                </a>
+                            </div>
+                        </form>
+
+                        <div className="mt-4 space-y-3">
+                            {digitalTwinNotice && <FormNotice tone="success">{digitalTwinNotice}</FormNotice>}
+                            {digitalTwinError && <FormNotice tone="error">{digitalTwinError}</FormNotice>}
+                        </div>
+
+                        <div className="mt-4 rounded-xl border border-slate-200/90 bg-white/85 px-4 py-3 text-sm text-slate-600">
+                            <p>Remaining digital twin requests today: <span className="font-semibold text-slate-900">{digitalTwinQuotaRemaining ?? 'Unknown'}</span></p>
                         </div>
                     </article>
 
                     <article className="rounded-2xl border border-slate-200/90 bg-[linear-gradient(145deg,#f0f9ff_0%,#dbeafe_100%)] p-5">
                         <h4 className="text-lg font-semibold text-slate-900">Create a virtual character</h4>
                         <p className="mt-2 text-sm text-slate-600">
-                            Use HeyGen Photo Avatar APIs to generate and train a custom avatar.
+                            Use HeyGen Photo Avatar APIs to generate and train a custom avatar from image prompts.
                         </p>
                         <div className="mt-4 flex flex-wrap gap-2">
                             <a className="btn-secondary" href={PHOTO_AVATAR_DOC_URL} target="_blank" rel="noreferrer">
                                 Photo Avatar Docs
                             </a>
                             <button type="button" className="btn-secondary" onClick={() => void loadCatalog()}>
-                                I created one, refresh list
+                                Refresh avatar catalog
                             </button>
                         </div>
                     </article>
+                </div>
+
+                <div className="mt-6">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <h4 className="text-lg font-semibold text-slate-900">Digital Twin Requests</h4>
+                        <button
+                            type="button"
+                            className="btn-secondary !min-h-9 !rounded-lg !px-3 !py-1.5 !text-sm"
+                            onClick={() => void loadDigitalTwins()}
+                        >
+                            Refresh
+                        </button>
+                    </div>
+
+                    {digitalTwinLoading ? (
+                        <div className="rounded-xl border border-slate-200/90 bg-slate-50/80 px-4 py-6 text-sm text-slate-600">
+                            Loading digital twin requests...
+                        </div>
+                    ) : digitalTwins.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-6 text-sm text-slate-600">
+                            No digital twin requests yet.
+                        </div>
+                    ) : (
+                        <div className="grid gap-3 lg:grid-cols-2">
+                            {digitalTwins.map((request) => (
+                                <article key={request.id} className="rounded-xl border border-slate-200/90 bg-white/90 px-4 py-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <p className="text-base font-semibold text-slate-900">{request.avatar_name}</p>
+                                        <span className={resolveDigitalTwinBadgeClass(request.status)}>{request.status}</span>
+                                    </div>
+
+                                    <p className="mt-1 font-mono text-xs text-slate-500">Request #{request.id}</p>
+                                    <p className="mt-2 text-sm text-slate-600">
+                                        Provider Avatar ID: <span className="font-mono text-xs text-slate-700">{request.provider_avatar_id ?? 'pending'}</span>
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate-500">Submitted: {formatDateTime(request.submitted_at)}</p>
+                                    <p className="mt-1 text-xs text-slate-500">Updated: {formatDateTime(request.updated_at)}</p>
+
+                                    {request.error_message ? (
+                                        <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{request.error_message}</p>
+                                    ) : null}
+
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        {request.preview_image_url ? (
+                                            <a href={request.preview_image_url} target="_blank" rel="noreferrer" className="btn-secondary !min-h-8 !rounded-lg !px-2.5 !py-1 !text-xs">
+                                                Preview Image
+                                            </a>
+                                        ) : null}
+                                        {request.preview_video_url ? (
+                                            <a href={request.preview_video_url} target="_blank" rel="noreferrer" className="btn-secondary !min-h-8 !rounded-lg !px-2.5 !py-1 !text-xs">
+                                                Preview Video
+                                            </a>
+                                        ) : null}
+                                    </div>
+                                </article>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </article>
         </section>
