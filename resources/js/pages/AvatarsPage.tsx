@@ -235,7 +235,7 @@ export function AvatarsPage() {
         setError(null);
 
         try {
-            const catalog = await heygenApi.getCatalog();
+            const catalog = await heygenApi.getCatalog({ include: 'avatars' });
             const normalized = catalog.avatars
                 .map((item) => normalizeAvatar(item, currentUserId))
                 .filter((item): item is AvatarCard => item !== null);

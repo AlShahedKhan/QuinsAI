@@ -42,6 +42,11 @@ return [
         'timeout' => (int) env('HEYGEN_TIMEOUT', 20),
         'retry_times' => (int) env('HEYGEN_RETRY_TIMES', 2),
         'retry_sleep_ms' => (int) env('HEYGEN_RETRY_SLEEP_MS', 250),
+        'catalog_timeout' => (int) env('HEYGEN_CATALOG_TIMEOUT', 45),
+        'catalog_retry_times' => (int) env('HEYGEN_CATALOG_RETRY_TIMES', 0),
+        'catalog_ttl_minutes' => (int) env('HEYGEN_CATALOG_TTL_MINUTES', 360),
+        'catalog_stale_ttl_minutes' => (int) env('HEYGEN_CATALOG_STALE_TTL_MINUTES', 10080),
+        'catalog_max_execution_seconds' => (int) env('HEYGEN_CATALOG_MAX_EXECUTION_SECONDS', 180),
         'script_max_chars' => (int) env('HEYGEN_SCRIPT_MAX_CHARS', 1500),
         'script_blocklist' => array_values(array_filter(array_map(
             static fn (string $term): string => trim($term),

@@ -14,9 +14,13 @@ type CreateLiveSessionInput = {
 };
 
 export const heygenApi = {
-    async getCatalog(): Promise<CatalogDto> {
+    async getCatalog(options: { include?: 'all' | 'avatars' | 'voices' } = {}): Promise<CatalogDto> {
+        const include = options.include ?? 'all';
+
         try {
-            const response = await apiClient.get<{ data: CatalogDto }>('/api/heygen/catalog');
+            const response = await apiClient.get<{ data: CatalogDto }>('/api/heygen/catalog', {
+                params: include === 'all' ? undefined : { include },
+            });
             return response.data.data;
         } catch (error) {
             throw toApiError(error);

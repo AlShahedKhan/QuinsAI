@@ -27,17 +27,27 @@ class HeyGenClient
     /**
      * @return array<string, mixed>
      */
-    public function listAvatars(): array
+    public function listAvatars(?int $timeoutSeconds = null, ?int $retryTimes = null): array
     {
-        return $this->request('get', '/v2/avatars');
+        return $this->request(
+            method: 'get',
+            uri: '/v2/avatars',
+            timeoutSeconds: $timeoutSeconds,
+            retryTimes: $retryTimes,
+        );
     }
 
     /**
      * @return array<string, mixed>
      */
-    public function listVoices(): array
+    public function listVoices(?int $timeoutSeconds = null, ?int $retryTimes = null): array
     {
-        return $this->request('get', '/v2/voices');
+        return $this->request(
+            method: 'get',
+            uri: '/v2/voices',
+            timeoutSeconds: $timeoutSeconds,
+            retryTimes: $retryTimes,
+        );
     }
 
     /**
@@ -98,7 +108,13 @@ class HeyGenClient
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    private function request(string $method, string $uri, array $payload = []): array
+    private function request(
+        string $method,
+        string $uri,
+        array $payload = [],
+        ?int $timeoutSeconds = null,
+        ?int $retryTimes = null,
+    ): array
     {
         $apiKey = (string) config('services.heygen.api_key');
 
@@ -106,10 +122,16 @@ class HeyGenClient
             throw new HeyGenException('HeyGen API key is not configured.', 500);
         }
 
+        $request = $this->baseRequest(
+            apiKey: $apiKey,
+            timeoutSeconds: $timeoutSeconds,
+            retryTimes: $retryTimes,
+        );
+
         $response = match (strtolower($method)) {
-            'get' => $this->baseRequest($apiKey)->get($uri, $payload),
-            'post' => $this->baseRequest($apiKey)->post($uri, $payload),
-            'delete' => $this->baseRequest($apiKey)->delete($uri, $payload),
+            'get' => $request->get($uri, $payload),
+            'post' => $request->post($uri, $payload),
+            'delete' => $request->delete($uri, $payload),
             default => throw new HeyGenException("Unsupported HeyGen method [$method].", 500),
         };
 
@@ -138,17 +160,26 @@ class HeyGenClient
         return $json;
     }
 
-    private function baseRequest(string $apiKey): PendingRequest
+    private function baseRequest(string $apiKey, ?int $timeoutSeconds = null, ?int $retryTimes = null): PendingRequest
     {
-        return Http::baseUrl((string) config('services.heygen.base_url'))
+        $timeout = max(1, $timeoutSeconds ?? (int) config('services.heygen.timeout', 20));
+        $retries = max(0, $retryTimes ?? (int) config('services.heygen.retry_times', 2));
+
+        $request = Http::baseUrl((string) config('services.heygen.base_url'))
             ->acceptJson()
-            ->timeout((int) config('services.heygen.timeout', 20))
-            ->retry(
-                times: (int) config('services.heygen.retry_times', 2),
-                sleepMilliseconds: (int) config('services.heygen.retry_sleep_ms', 250),
-            )
+            ->timeout($timeout)
+            ->connectTimeout(min(10, $timeout))
             ->withHeaders([
                 'X-Api-Key' => $apiKey,
             ]);
+
+        if ($retries > 0) {
+            $request = $request->retry(
+                times: $retries,
+                sleepMilliseconds: (int) config('services.heygen.retry_sleep_ms', 250),
+            );
+        }
+
+        return $request;
     }
 }

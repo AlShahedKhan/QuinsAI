@@ -5,9 +5,11 @@ use App\Jobs\SubmitHeyGenVideoJob;
 use App\Models\HeyGenVideoJob;
 use App\Models\HeyGenWebhookEvent;
 use App\Models\User;
+use App\Services\HeyGen\HeyGenCatalogService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
+use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
 
@@ -95,6 +97,28 @@ test('unverified users can access heygen api when authenticated', function () {
         ->assertJsonPath('data.status', 'queued');
 
     Queue::assertPushed(SubmitHeyGenVideoJob::class, 1);
+});
+
+test('catalog endpoint can fetch avatars only without voices', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => null,
+    ]);
+    Sanctum::actingAs($user);
+
+    $this->mock(HeyGenCatalogService::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('getAvatars')
+            ->once()
+            ->andReturn([
+                ['avatar_id' => 'avatar_1'],
+            ]);
+        $mock->shouldReceive('getVoices')->never();
+        $mock->shouldReceive('getCatalog')->never();
+    });
+
+    $this->getJson('/api/heygen/catalog?include=avatars')
+        ->assertOk()
+        ->assertJsonPath('data.avatars.0.avatar_id', 'avatar_1')
+        ->assertJsonPath('data.voices', []);
 });
 
 test('webhook is idempotent and only queues processing once', function () {
