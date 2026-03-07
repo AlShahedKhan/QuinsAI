@@ -1,8 +1,10 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { PublicAvatarDetailsModal } from '../components/avatars/PublicAvatarDetailsModal';
 import { FormNotice } from '../components/ui/FormNotice';
 import { heygenApi } from '../lib/heygenApi';
-import type { CatalogItem, DigitalTwinDto, DigitalTwinStatus } from '../types/heygen';
+import type { CatalogItem, DigitalTwinDto, DigitalTwinStatus, PublicAvatarDetailDto } from '../types/heygen';
 
 type AvatarTab = 'public' | 'my';
 type AvatarVisibility = AvatarTab | 'unknown';
@@ -235,6 +237,7 @@ function resolveDigitalTwinBadgeClass(status: DigitalTwinStatus): string {
 
 export function AvatarsPage() {
     const { state } = useAuth();
+    const navigate = useNavigate();
     const [publicAvatars, setPublicAvatars] = useState<AvatarCard[]>([]);
     const [activeTab, setActiveTab] = useState<AvatarTab>('public');
     const [activeCategory, setActiveCategory] = useState('All');
@@ -258,6 +261,10 @@ export function AvatarsPage() {
     const [submittingTwin, setSubmittingTwin] = useState(false);
     const [uploadInputKey, setUploadInputKey] = useState(0);
     const [previewingAvatarId, setPreviewingAvatarId] = useState<string | null>(null);
+    const [selectedPublicAvatar, setSelectedPublicAvatar] = useState<AvatarCard | null>(null);
+    const [selectedPublicAvatarDetails, setSelectedPublicAvatarDetails] = useState<PublicAvatarDetailDto | null>(null);
+    const [selectedPublicAvatarLoading, setSelectedPublicAvatarLoading] = useState(false);
+    const [selectedPublicAvatarError, setSelectedPublicAvatarError] = useState<string | null>(null);
     const previewDelayTimeoutRef = useRef<number | null>(null);
 
     const currentUserId = state.user?.id ?? null;
@@ -340,6 +347,44 @@ export function AvatarsPage() {
             window.clearInterval(intervalId);
         };
     }, [digitalTwins, loadDigitalTwins]);
+
+    useEffect(() => {
+        if (selectedPublicAvatar === null) {
+            setSelectedPublicAvatarDetails(null);
+            setSelectedPublicAvatarError(null);
+            setSelectedPublicAvatarLoading(false);
+            return;
+        }
+
+        let active = true;
+        setSelectedPublicAvatarLoading(true);
+        setSelectedPublicAvatarError(null);
+
+        heygenApi.getPublicAvatarDetails(selectedPublicAvatar.id)
+            .then((details) => {
+                if (!active) {
+                    return;
+                }
+
+                setSelectedPublicAvatarDetails(details);
+            })
+            .catch((err: Error) => {
+                if (!active) {
+                    return;
+                }
+
+                setSelectedPublicAvatarError(err.message);
+            })
+            .finally(() => {
+                if (active) {
+                    setSelectedPublicAvatarLoading(false);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [selectedPublicAvatar]);
 
     const myAvatars = useMemo(() => (
         digitalTwins
@@ -472,6 +517,35 @@ export function AvatarsPage() {
         });
     }, [clearPreviewDelay]);
 
+    const openPublicAvatarModal = useCallback((avatar: AvatarCard) => {
+        stopAvatarPreview();
+        setSelectedPublicAvatar(avatar);
+    }, [stopAvatarPreview]);
+
+    const closePublicAvatarModal = useCallback(() => {
+        stopAvatarPreview();
+        setSelectedPublicAvatar(null);
+        setSelectedPublicAvatarDetails(null);
+        setSelectedPublicAvatarError(null);
+    }, [stopAvatarPreview]);
+
+    const navigateWithSelectedAvatar = useCallback((path: string) => {
+        if (selectedPublicAvatar === null) {
+            return;
+        }
+
+        const params = new URLSearchParams({
+            avatar_id: selectedPublicAvatar.id,
+        });
+
+        if (selectedPublicAvatarDetails?.default_voice_id) {
+            params.set('voice_id', selectedPublicAvatarDetails.default_voice_id);
+        }
+
+        navigate(`${path}?${params.toString()}`);
+        closePublicAvatarModal();
+    }, [closePublicAvatarModal, navigate, selectedPublicAvatar, selectedPublicAvatarDetails]);
+
     async function handleDigitalTwinSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!canSubmitDigitalTwin) {
@@ -509,6 +583,7 @@ export function AvatarsPage() {
     }
 
     return (
+        <>
         <section className="grid gap-6">
             <article className="surface-card page-enter p-6 sm:p-7">
                 <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -609,16 +684,32 @@ export function AvatarsPage() {
                     <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                         {displayAvatars.map((avatar) => {
                             const isPreviewing = previewingAvatarId === avatar.id && avatar.previewVideoUrl !== null;
+                            const isOpenable = activeTab === 'public';
 
                             return (
                             <article
                                 key={avatar.id}
-                                tabIndex={avatar.previewVideoUrl ? 0 : -1}
-                                className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-100 shadow-sm"
+                                tabIndex={isOpenable || avatar.previewVideoUrl ? 0 : -1}
+                                className={`group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-100 shadow-sm ${isOpenable ? 'cursor-pointer' : ''}`}
                                 onMouseEnter={() => scheduleAvatarPreview(avatar.id, avatar.previewVideoUrl)}
                                 onMouseLeave={() => stopAvatarPreview(avatar.id)}
                                 onFocus={() => scheduleAvatarPreview(avatar.id, avatar.previewVideoUrl)}
                                 onBlur={() => stopAvatarPreview(avatar.id)}
+                                onClick={() => {
+                                    if (isOpenable) {
+                                        openPublicAvatarModal(avatar);
+                                    }
+                                }}
+                                onKeyDown={(event) => {
+                                    if (!isOpenable) {
+                                        return;
+                                    }
+
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                        event.preventDefault();
+                                        openPublicAvatarModal(avatar);
+                                    }
+                                }}
                             >
                                 <div className="relative aspect-[3/4]">
                                     {avatar.previewUrl ? (
@@ -655,6 +746,12 @@ export function AvatarsPage() {
                                     {avatar.previewVideoUrl ? (
                                         <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-slate-950/62 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
                                             {isPreviewing ? 'Previewing' : 'Hover to preview'}
+                                        </div>
+                                    ) : null}
+
+                                    {isOpenable ? (
+                                        <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-white/84 px-2.5 py-1 text-[11px] font-semibold text-slate-900 backdrop-blur">
+                                            Open details
                                         </div>
                                     ) : null}
 
@@ -868,5 +965,17 @@ export function AvatarsPage() {
                 </div>
             </article>
         </section>
+        {selectedPublicAvatar ? (
+            <PublicAvatarDetailsModal
+                avatar={selectedPublicAvatar}
+                details={selectedPublicAvatarDetails}
+                loading={selectedPublicAvatarLoading}
+                error={selectedPublicAvatarError}
+                onClose={closePublicAvatarModal}
+                onUseForVideo={() => navigateWithSelectedAvatar('/videos/generate')}
+                onUseForLive={() => navigateWithSelectedAvatar('/live')}
+            />
+        ) : null}
+        </>
     );
 }

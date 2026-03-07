@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\PermissionController as AdminPermissionController;
+use App\Http\Controllers\Api\Admin\PublicAvatarCatalogController as AdminPublicAvatarCatalogController;
 use App\Http\Controllers\Api\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\PasswordController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\Api\HeyGen\DigitalTwinController;
 use App\Http\Controllers\Api\HeyGen\DigitalTwinMediaController;
 use App\Http\Controllers\Api\HeyGen\LiveSessionController;
 use App\Http\Controllers\Api\HeyGen\PublicAvatarController;
+use App\Http\Controllers\Api\HeyGen\PublicAvatarDetailController;
 use App\Http\Controllers\Api\HeyGen\VideoController;
 use App\Http\Controllers\Api\HeyGen\WebhookController;
 use Illuminate\Support\Facades\Route;
@@ -43,6 +45,7 @@ Route::prefix('auth')->group(function (): void {
 Route::middleware(['auth:sanctum', 'throttle:heygen-read'])->prefix('heygen')->group(function (): void {
     Route::get('/catalog', CatalogController::class);
     Route::get('/public-avatars', PublicAvatarController::class);
+    Route::get('/public-avatars/{avatarId}/details', PublicAvatarDetailController::class);
 
     Route::get('/videos', [VideoController::class, 'index']);
     Route::get('/videos/{videoJob}', [VideoController::class, 'show']);
@@ -57,6 +60,9 @@ Route::middleware(['auth:sanctum', 'throttle:heygen-read'])->prefix('heygen')->g
 });
 
 Route::middleware(['auth:sanctum', 'throttle:admin-security'])->prefix('admin')->group(function (): void {
+    Route::get('/heygen/public-avatars', [AdminPublicAvatarCatalogController::class, 'show'])->middleware('admin.access');
+    Route::post('/heygen/public-avatars/sync', [AdminPublicAvatarCatalogController::class, 'sync'])->middleware('admin.access');
+
     Route::get('/roles', [AdminRoleController::class, 'index'])->middleware('permission:roles.view');
     Route::post('/roles', [AdminRoleController::class, 'store'])->middleware('permission:roles.create');
     Route::get('/roles/{role}', [AdminRoleController::class, 'show'])->middleware('permission:roles.view');

@@ -51,6 +51,19 @@ class HeyGenClient
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function getAvatarDetails(string $avatarId, ?int $timeoutSeconds = null, ?int $retryTimes = null): array
+    {
+        return $this->request(
+            method: 'get',
+            uri: '/v2/avatar/'.rawurlencode($avatarId).'/details',
+            timeoutSeconds: $timeoutSeconds,
+            retryTimes: $retryTimes,
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */

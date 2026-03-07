@@ -86,6 +86,24 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return $this->hasRole('super-admin');
+        return (bool) $this->is_admin || $this->hasRole('super-admin');
+    }
+
+    public function canAccessAdminPanel(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->hasAnyPermission([
+            'roles.view',
+            'roles.create',
+            'roles.update',
+            'roles.delete',
+            'permissions.view',
+            'permissions.create',
+            'permissions.update',
+            'permissions.delete',
+        ]);
     }
 }

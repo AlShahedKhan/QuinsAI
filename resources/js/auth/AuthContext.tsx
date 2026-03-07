@@ -200,6 +200,10 @@ export function getAdminLandingPath(user: AuthUserDto | null): string | null {
         return null;
     }
 
+    if (user?.is_admin || user?.roles.includes('super-admin')) {
+        return '/admin/avatar-catalog';
+    }
+
     if (hasPermission(user, 'roles.view')) {
         return '/admin/roles';
     }
@@ -208,5 +212,5 @@ export function getAdminLandingPath(user: AuthUserDto | null): string | null {
         return '/admin/permissions';
     }
 
-    return '/videos/generate';
+    return '/admin/avatar-catalog';
 }

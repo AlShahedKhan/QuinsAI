@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { heygenApi } from '../lib/heygenApi';
 import { FormNotice } from '../components/ui/FormNotice';
 import type { CatalogDto, LiveSessionDto } from '../types/heygen';
@@ -27,7 +28,6 @@ function resolveId(item: Record<string, unknown>): string {
 
     return '';
 }
-
 function resolveLabel(item: Record<string, unknown>): string {
     const candidates = [item.display_name, item.name, item.avatar_id, item.voice_id, item.id];
 
@@ -41,6 +41,7 @@ function resolveLabel(item: Record<string, unknown>): string {
 }
 
 export function LiveAvatarPage() {
+    const [searchParams] = useSearchParams();
     const [catalog, setCatalog] = useState<CatalogDto>({ avatars: [], voices: [] });
     const [avatarId, setAvatarId] = useState('');
     const [voiceId, setVoiceId] = useState('');
@@ -52,6 +53,8 @@ export function LiveAvatarPage() {
 
     const sdkRef = useRef<StreamingAvatarLike | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
+    const requestedAvatarId = searchParams.get('avatar_id') ?? '';
+    const requestedVoiceId = searchParams.get('voice_id') ?? '';
 
     useEffect(() => {
         let active = true;
@@ -63,8 +66,16 @@ export function LiveAvatarPage() {
                 }
 
                 setCatalog(data);
-                setAvatarId((current) => current || (data.avatars[0] ? resolveId(data.avatars[0]) : ''));
-                setVoiceId((current) => current || (data.voices[0] ? resolveId(data.voices[0]) : ''));
+
+                const preferredAvatarId = requestedAvatarId !== '' && data.avatars.some((avatar) => resolveId(avatar) === requestedAvatarId)
+                    ? requestedAvatarId
+                    : (data.avatars[0] ? resolveId(data.avatars[0]) : '');
+                const preferredVoiceId = requestedVoiceId !== '' && data.voices.some((voice) => resolveId(voice) === requestedVoiceId)
+                    ? requestedVoiceId
+                    : (data.voices[0] ? resolveId(data.voices[0]) : '');
+
+                setAvatarId((current) => current || preferredAvatarId);
+                setVoiceId((current) => current || preferredVoiceId);
             })
             .catch((err: Error) => {
                 if (!active) {
@@ -77,7 +88,7 @@ export function LiveAvatarPage() {
         return () => {
             active = false;
         };
-    }, []);
+    }, [requestedAvatarId, requestedVoiceId]);
 
     const canStart = useMemo(
         () => !loading && session === null && avatarId !== '' && voiceId !== '',

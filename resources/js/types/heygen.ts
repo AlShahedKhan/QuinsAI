@@ -77,6 +77,45 @@ export type PublicAvatarListDto = Paginated<CatalogItem> & {
     };
 };
 
+export type PublicAvatarLookDto = {
+    id: string;
+    name: string;
+    preview_image_url: string | null;
+    preview_video_url: string | null;
+};
+
+export type PublicAvatarDetailDto = {
+    avatar_id: string;
+    display_name: string;
+    name: string;
+    preview_image_url: string | null;
+    preview_video_url: string | null;
+    gender: string | null;
+    default_voice_id: string | null;
+    premium: boolean;
+    is_public: boolean;
+    tags: string[];
+    looks: PublicAvatarLookDto[];
+    looks_available: boolean;
+    looks_note: string | null;
+    details_source: 'provider' | 'cache' | 'local';
+    details_notice: string | null;
+};
+
+export type PublicAvatarCatalogStatsDto = {
+    total: number;
+    active: number;
+    inactive: number;
+    preview_video_count: number;
+    categories_count: number;
+    last_synced_at: string | null;
+    latest_avatar_id: string | null;
+    looks_support: {
+        public_avatar_api_exposes_looks: boolean;
+        note: string;
+    };
+};
+
 export type ApiErrorDto = {
     message: string;
     error?: {

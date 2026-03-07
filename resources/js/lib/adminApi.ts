@@ -1,5 +1,5 @@
 import { apiClient, toApiError } from './apiClient';
-import type { PermissionDto, RoleDto } from '../types/heygen';
+import type { PermissionDto, PublicAvatarCatalogStatsDto, RoleDto } from '../types/heygen';
 
 type RolePayload = {
     name: string;
@@ -11,6 +11,26 @@ type PermissionPayload = {
 };
 
 export const adminApi = {
+    async getPublicAvatarCatalogStats(): Promise<PublicAvatarCatalogStatsDto> {
+        try {
+            const response = await apiClient.get<{ data: PublicAvatarCatalogStatsDto }>('/api/admin/heygen/public-avatars');
+            return response.data.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
+    async syncPublicAvatarCatalog(): Promise<{ message: string; summary: Record<string, number>; data: PublicAvatarCatalogStatsDto }> {
+        try {
+            const response = await apiClient.post<{ message: string; summary: Record<string, number>; data: PublicAvatarCatalogStatsDto }>(
+                '/api/admin/heygen/public-avatars/sync',
+            );
+            return response.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
     async listRoles(): Promise<RoleDto[]> {
         try {
             const response = await apiClient.get<{ data: RoleDto[] }>('/api/admin/roles');
@@ -81,4 +101,3 @@ export const adminApi = {
         }
     },
 };
-

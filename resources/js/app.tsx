@@ -18,6 +18,7 @@ import { AdminLoginPage } from './pages/auth/AdminLoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
+import { PublicAvatarCatalogAdminPage } from './pages/admin/PublicAvatarCatalogAdminPage';
 import { RolesAdminPage } from './pages/admin/RolesAdminPage';
 import { PermissionsAdminPage } from './pages/admin/PermissionsAdminPage';
 import type { AuthUserDto, VideoJobDto } from './types/heygen';
@@ -30,33 +31,44 @@ const coreNavItems = [
 ] as const;
 
 type NavLinkItem = { to: string; label: string };
-type AdminNavGroup = { label: string; items: NavLinkItem[] } | null;
+type AdminNavGroup = { label: string; items: NavLinkItem[] };
 
 function resolveHomePath(user: AuthUserDto | null): string {
     return getAdminLandingPath(user) ?? '/videos/generate';
 }
 
-function buildAdminNavGroup(user: AuthUserDto | null): AdminNavGroup {
-    const adminItems: NavLinkItem[] = [];
+function buildAdminNavGroups(user: AuthUserDto | null): AdminNavGroup[] {
+    const groups: AdminNavGroup[] = [];
+    const securityItems: NavLinkItem[] = [];
 
     if (canAccessAdmin(user)) {
         if (hasPermission(user, 'roles.view')) {
-            adminItems.push({ to: '/admin/roles', label: 'Roles' });
+            securityItems.push({ to: '/admin/roles', label: 'Roles' });
         }
 
         if (hasPermission(user, 'permissions.view')) {
-            adminItems.push({ to: '/admin/permissions', label: 'Permissions' });
+            securityItems.push({ to: '/admin/permissions', label: 'Permissions' });
         }
+
+        groups.push({
+            label: 'HeyGen Admin',
+            items: [{ to: '/admin/avatar-catalog', label: 'Avatar Catalog' }],
+        });
     }
 
-    return adminItems.length > 0
-        ? { label: 'Users & Roles', items: adminItems }
-        : null;
+    if (securityItems.length > 0) {
+        groups.push({
+            label: 'Users & Roles',
+            items: securityItems,
+        });
+    }
+
+    return groups;
 }
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
     const { state, logout } = useAuth();
-    const adminNavGroup = React.useMemo(() => buildAdminNavGroup(state.user), [state.user]);
+    const adminNavGroups = React.useMemo(() => buildAdminNavGroups(state.user), [state.user]);
 
     return (
         <main className="app-shell">
@@ -117,14 +129,14 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                         </div>
                     </div>
 
-                    {adminNavGroup ? (
-                        <div className="mt-4 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-3">
+                    {adminNavGroups.map((group) => (
+                        <div key={group.label} className="mt-4 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-3">
                             <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                                {adminNavGroup.label}
+                                {group.label}
                             </p>
 
                             <div className="flex flex-col gap-1">
-                                {adminNavGroup.items.map((item) => (
+                                {group.items.map((item) => (
                                     <NavLink
                                         key={item.to}
                                         to={item.to}
@@ -140,7 +152,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                                 ))}
                             </div>
                         </div>
-                    ) : null}
+                    ))}
                 </aside>
 
                 <div className="min-w-0">
@@ -239,6 +251,17 @@ function AppRouter() {
                             <LiveAvatarPage />
                         </AuthenticatedLayout>
                     </ProtectedRoute>
+                )}
+            />
+
+            <Route
+                path="/admin/avatar-catalog"
+                element={(
+                    <AdminRoute>
+                        <AuthenticatedLayout>
+                            <PublicAvatarCatalogAdminPage />
+                        </AuthenticatedLayout>
+                    </AdminRoute>
                 )}
             />
 

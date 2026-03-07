@@ -1,4 +1,5 @@
-﻿import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { heygenApi } from '../lib/heygenApi';
 import { FormNotice } from '../components/ui/FormNotice';
 import type { CatalogDto, VideoJobDto } from '../types/heygen';
@@ -18,7 +19,6 @@ function resolveCatalogItemId(item: Record<string, unknown>): string {
 
     return '';
 }
-
 function resolveCatalogItemLabel(item: Record<string, unknown>): string {
     const labelCandidates = [item.display_name, item.name, item.avatar_id, item.voice_id, item.id];
 
@@ -32,6 +32,7 @@ function resolveCatalogItemLabel(item: Record<string, unknown>): string {
 }
 
 export function VideoGeneratorPage({ onVideoCreated }: Props) {
+    const [searchParams] = useSearchParams();
     const [catalog, setCatalog] = useState<CatalogDto>({ avatars: [], voices: [] });
     const [avatarId, setAvatarId] = useState('');
     const [voiceId, setVoiceId] = useState('');
@@ -40,6 +41,8 @@ export function VideoGeneratorPage({ onVideoCreated }: Props) {
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [quotaRemaining, setQuotaRemaining] = useState<number | null>(null);
+    const requestedAvatarId = searchParams.get('avatar_id') ?? '';
+    const requestedVoiceId = searchParams.get('voice_id') ?? '';
 
     useEffect(() => {
         let active = true;
@@ -52,8 +55,16 @@ export function VideoGeneratorPage({ onVideoCreated }: Props) {
                 }
 
                 setCatalog(data);
-                setAvatarId((previous) => previous || (data.avatars[0] ? resolveCatalogItemId(data.avatars[0]) : ''));
-                setVoiceId((previous) => previous || (data.voices[0] ? resolveCatalogItemId(data.voices[0]) : ''));
+
+                const preferredAvatarId = requestedAvatarId !== '' && data.avatars.some((avatar) => resolveCatalogItemId(avatar) === requestedAvatarId)
+                    ? requestedAvatarId
+                    : (data.avatars[0] ? resolveCatalogItemId(data.avatars[0]) : '');
+                const preferredVoiceId = requestedVoiceId !== '' && data.voices.some((voice) => resolveCatalogItemId(voice) === requestedVoiceId)
+                    ? requestedVoiceId
+                    : (data.voices[0] ? resolveCatalogItemId(data.voices[0]) : '');
+
+                setAvatarId((previous) => previous || preferredAvatarId);
+                setVoiceId((previous) => previous || preferredVoiceId);
             } catch (err) {
                 if (!active) {
                     return;
@@ -69,7 +80,7 @@ export function VideoGeneratorPage({ onVideoCreated }: Props) {
         return () => {
             active = false;
         };
-    }, []);
+    }, [requestedAvatarId, requestedVoiceId]);
 
     const scriptLength = script.trim().length;
 

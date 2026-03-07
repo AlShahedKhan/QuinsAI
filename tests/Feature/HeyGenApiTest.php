@@ -7,6 +7,7 @@ use App\Models\HeyGenVideoJob;
 use App\Models\HeyGenWebhookEvent;
 use App\Models\User;
 use App\Services\HeyGen\HeyGenCatalogService;
+use App\Services\HeyGen\HeyGenPublicAvatarDetailService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
@@ -156,6 +157,49 @@ test('public avatars endpoint returns paginated local avatar catalog', function 
         ->assertJsonPath('data.0.preview_video_url', 'https://cdn.example.com/annie.mp4')
         ->assertJsonPath('total', 1)
         ->assertJsonPath('meta.categories.0', 'Professional');
+});
+
+test('public avatar details endpoint returns avatar detail payload', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => null,
+    ]);
+    Sanctum::actingAs($user);
+
+    HeyGenPublicAvatar::query()->create([
+        'provider_avatar_id' => 'avatar_annie',
+        'name' => 'Annie',
+        'preview_image_url' => 'https://cdn.example.com/annie.jpg',
+        'categories' => ['Professional'],
+        'is_active' => true,
+    ]);
+
+    $this->mock(HeyGenPublicAvatarDetailService::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('getDetails')
+            ->once()
+            ->andReturn([
+                'avatar_id' => 'avatar_annie',
+                'display_name' => 'Annie',
+                'name' => 'Annie',
+                'preview_image_url' => 'https://cdn.example.com/annie.jpg',
+                'preview_video_url' => 'https://cdn.example.com/annie.mp4',
+                'gender' => 'female',
+                'default_voice_id' => 'voice_1',
+                'premium' => false,
+                'is_public' => true,
+                'tags' => ['NEW'],
+                'looks' => [],
+                'looks_available' => false,
+                'looks_note' => 'No separate looks exposed.',
+                'details_source' => 'provider',
+                'details_notice' => null,
+            ]);
+    });
+
+    $this->getJson('/api/heygen/public-avatars/avatar_annie/details')
+        ->assertOk()
+        ->assertJsonPath('data.avatar_id', 'avatar_annie')
+        ->assertJsonPath('data.default_voice_id', 'voice_1')
+        ->assertJsonPath('data.looks_available', false);
 });
 
 test('webhook is idempotent and only queues processing once', function () {
