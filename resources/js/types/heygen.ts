@@ -69,6 +69,13 @@ export type CatalogDto = {
     voices: CatalogItem[];
 };
 
+export type PublicAvatarListDto = Paginated<CatalogItem> & {
+    meta: {
+        categories: string[];
+        last_synced_at: string | null;
+    };
+};
+
 export type ApiErrorDto = {
     message: string;
     error?: {

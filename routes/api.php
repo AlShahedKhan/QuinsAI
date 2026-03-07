@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\HeyGen\CatalogController;
 use App\Http\Controllers\Api\HeyGen\DigitalTwinController;
 use App\Http\Controllers\Api\HeyGen\DigitalTwinMediaController;
 use App\Http\Controllers\Api\HeyGen\LiveSessionController;
+use App\Http\Controllers\Api\HeyGen\PublicAvatarController;
 use App\Http\Controllers\Api\HeyGen\VideoController;
 use App\Http\Controllers\Api\HeyGen\WebhookController;
 use Illuminate\Support\Facades\Route;
@@ -41,6 +42,7 @@ Route::prefix('auth')->group(function (): void {
 
 Route::middleware(['auth:sanctum', 'throttle:heygen-read'])->prefix('heygen')->group(function (): void {
     Route::get('/catalog', CatalogController::class);
+    Route::get('/public-avatars', PublicAvatarController::class);
 
     Route::get('/videos', [VideoController::class, 'index']);
     Route::get('/videos/{videoJob}', [VideoController::class, 'show']);

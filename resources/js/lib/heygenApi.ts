@@ -1,5 +1,5 @@
 import { apiClient, toApiError } from './apiClient';
-import type { CatalogDto, DigitalTwinDto, LiveSessionDto, Paginated, VideoJobDto } from '../types/heygen';
+import type { CatalogDto, DigitalTwinDto, LiveSessionDto, Paginated, PublicAvatarListDto, VideoJobDto } from '../types/heygen';
 
 type CreateVideoInput = {
     avatar_id: string;
@@ -30,6 +30,15 @@ export const heygenApi = {
     async createVideo(input: CreateVideoInput): Promise<{ data: VideoJobDto; quota: Record<string, number> }> {
         try {
             const response = await apiClient.post<{ data: VideoJobDto; quota: Record<string, number> }>('/api/heygen/videos', input);
+            return response.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
+    async listPublicAvatars(params: { page?: number; per_page?: number; search?: string; category?: string } = {}): Promise<PublicAvatarListDto> {
+        try {
+            const response = await apiClient.get<PublicAvatarListDto>('/api/heygen/public-avatars', { params });
             return response.data;
         } catch (error) {
             throw toApiError(error);

@@ -47,6 +47,8 @@ return [
         'catalog_ttl_minutes' => (int) env('HEYGEN_CATALOG_TTL_MINUTES', 360),
         'catalog_stale_ttl_minutes' => (int) env('HEYGEN_CATALOG_STALE_TTL_MINUTES', 10080),
         'catalog_max_execution_seconds' => (int) env('HEYGEN_CATALOG_MAX_EXECUTION_SECONDS', 180),
+        'public_avatar_sync_timeout' => (int) env('HEYGEN_PUBLIC_AVATAR_SYNC_TIMEOUT', 180),
+        'public_avatar_sync_retry_times' => (int) env('HEYGEN_PUBLIC_AVATAR_SYNC_RETRY_TIMES', 0),
         'script_max_chars' => (int) env('HEYGEN_SCRIPT_MAX_CHARS', 1500),
         'script_blocklist' => array_values(array_filter(array_map(
             static fn (string $term): string => trim($term),

@@ -2,6 +2,7 @@
 
 use App\Jobs\ProcessHeyGenWebhookEventJob;
 use App\Jobs\SubmitHeyGenVideoJob;
+use App\Models\HeyGenPublicAvatar;
 use App\Models\HeyGenVideoJob;
 use App\Models\HeyGenWebhookEvent;
 use App\Models\User;
@@ -119,6 +120,38 @@ test('catalog endpoint can fetch avatars only without voices', function () {
         ->assertOk()
         ->assertJsonPath('data.avatars.0.avatar_id', 'avatar_1')
         ->assertJsonPath('data.voices', []);
+});
+
+test('public avatars endpoint returns paginated local avatar catalog', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => null,
+    ]);
+    Sanctum::actingAs($user);
+
+    HeyGenPublicAvatar::query()->create([
+        'provider_avatar_id' => 'avatar_annie',
+        'name' => 'Annie',
+        'preview_image_url' => 'https://cdn.example.com/annie.jpg',
+        'looks_count' => 15,
+        'categories' => ['Professional'],
+        'search_text' => 'annie avatar_annie professional',
+        'is_active' => true,
+        'synced_at' => now(),
+    ]);
+
+    HeyGenPublicAvatar::query()->create([
+        'provider_avatar_id' => 'avatar_inactive',
+        'name' => 'Inactive',
+        'categories' => ['Lifestyle'],
+        'is_active' => false,
+    ]);
+
+    $this->getJson('/api/heygen/public-avatars?search=annie&category=Professional&per_page=50')
+        ->assertOk()
+        ->assertJsonPath('data.0.avatar_id', 'avatar_annie')
+        ->assertJsonPath('data.0.display_name', 'Annie')
+        ->assertJsonPath('total', 1)
+        ->assertJsonPath('meta.categories.0', 'Professional');
 });
 
 test('webhook is idempotent and only queues processing once', function () {

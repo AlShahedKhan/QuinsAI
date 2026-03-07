@@ -166,6 +166,23 @@ function normalizeAvatar(item: CatalogItem, currentUserId: number | null): Avata
     };
 }
 
+function normalizeDigitalTwinAvatar(item: DigitalTwinDto): AvatarCard | null {
+    if (item.status !== 'completed') {
+        return null;
+    }
+
+    const id = item.provider_avatar_id ?? `digital-twin-${item.id}`;
+
+    return {
+        id,
+        name: item.avatar_name,
+        previewUrl: item.preview_image_url,
+        visibility: 'my',
+        looks: null,
+        categories: ['Digital Twin'],
+    };
+}
+
 function resolveInitials(name: string): string {
     const parts = name
         .split(/\s+/)
@@ -210,13 +227,18 @@ function resolveDigitalTwinBadgeClass(status: DigitalTwinStatus): string {
 
 export function AvatarsPage() {
     const { state } = useAuth();
-    const [avatars, setAvatars] = useState<AvatarCard[]>([]);
+    const [publicAvatars, setPublicAvatars] = useState<AvatarCard[]>([]);
     const [activeTab, setActiveTab] = useState<AvatarTab>('public');
     const [activeCategory, setActiveCategory] = useState('All');
     const [query, setQuery] = useState('');
+    const [debouncedQuery, setDebouncedQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [publicAvatarCategories, setPublicAvatarCategories] = useState<string[]>([]);
+    const [publicAvatarTotal, setPublicAvatarTotal] = useState(0);
+    const [publicAvatarLastPage, setPublicAvatarLastPage] = useState(1);
+    const [publicAvatarLastSyncedAt, setPublicAvatarLastSyncedAt] = useState<string | null>(null);
     const [digitalTwins, setDigitalTwins] = useState<DigitalTwinDto[]>([]);
     const [digitalTwinLoading, setDigitalTwinLoading] = useState(false);
     const [digitalTwinError, setDigitalTwinError] = useState<string | null>(null);
@@ -230,23 +252,33 @@ export function AvatarsPage() {
 
     const currentUserId = state.user?.id ?? null;
 
-    const loadCatalog = useCallback(async () => {
+    const loadPublicAvatars = useCallback(async () => {
         setLoading(true);
         setError(null);
 
         try {
-            const catalog = await heygenApi.getCatalog({ include: 'avatars' });
-            const normalized = catalog.avatars
+            const response = await heygenApi.listPublicAvatars({
+                page: currentPage,
+                per_page: 50,
+                search: debouncedQuery === '' ? undefined : debouncedQuery,
+                category: activeCategory === 'All' ? undefined : activeCategory,
+            });
+
+            const normalized = response.data
                 .map((item) => normalizeAvatar(item, currentUserId))
                 .filter((item): item is AvatarCard => item !== null);
-            setAvatars(normalized);
+            setPublicAvatars(normalized);
+            setPublicAvatarCategories(response.meta.categories);
+            setPublicAvatarTotal(response.total);
+            setPublicAvatarLastPage(response.last_page);
+            setPublicAvatarLastSyncedAt(response.meta.last_synced_at);
         } catch (err) {
             const normalizedError = err instanceof Error ? err : new Error('Failed to load avatars.');
             setError(normalizedError.message);
         } finally {
             setLoading(false);
         }
-    }, [currentUserId]);
+    }, [activeCategory, currentPage, currentUserId, debouncedQuery]);
 
     const loadDigitalTwins = useCallback(async () => {
         setDigitalTwinLoading(true);
@@ -264,8 +296,26 @@ export function AvatarsPage() {
     }, []);
 
     useEffect(() => {
-        void Promise.all([loadCatalog(), loadDigitalTwins()]);
-    }, [loadCatalog, loadDigitalTwins]);
+        const timeoutId = window.setTimeout(() => {
+            setDebouncedQuery(query.trim());
+        }, 250);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, [query]);
+
+    useEffect(() => {
+        void loadDigitalTwins();
+    }, [loadDigitalTwins]);
+
+    useEffect(() => {
+        if (activeTab !== 'public') {
+            return;
+        }
+
+        void loadPublicAvatars();
+    }, [activeTab, loadPublicAvatars]);
 
     useEffect(() => {
         if (!digitalTwins.some((item) => !TERMINAL_DIGITAL_TWIN_STATUSES.has(item.status))) {
@@ -281,43 +331,33 @@ export function AvatarsPage() {
         };
     }, [digitalTwins, loadDigitalTwins]);
 
-    const hasVisibilitySignals = useMemo(
-        () => avatars.some((avatar) => avatar.visibility !== 'unknown'),
-        [avatars],
-    );
+    const myAvatars = useMemo(() => (
+        digitalTwins
+            .map((item) => normalizeDigitalTwinAvatar(item))
+            .filter((item): item is AvatarCard => item !== null)
+    ), [digitalTwins]);
 
     const counts = useMemo(() => {
-        if (!hasVisibilitySignals) {
-            return {
-                public: avatars.length,
-                my: 0,
-            };
-        }
-
         return {
-            public: avatars.filter((avatar) => avatar.visibility === 'public').length,
-            my: avatars.filter((avatar) => avatar.visibility === 'my').length,
+            public: publicAvatarTotal,
+            my: myAvatars.length,
         };
-    }, [avatars, hasVisibilitySignals]);
-
-    const tabFiltered = useMemo(() => {
-        if (!hasVisibilitySignals) {
-            return activeTab === 'public' ? avatars : [];
-        }
-
-        return avatars.filter((avatar) => avatar.visibility === activeTab);
-    }, [avatars, activeTab, hasVisibilitySignals]);
+    }, [myAvatars.length, publicAvatarTotal]);
 
     const availableCategories = useMemo(() => {
+        if (activeTab === 'public') {
+            return ['All', ...publicAvatarCategories];
+        }
+
         const set = new Set<string>();
-        for (const avatar of tabFiltered) {
+        for (const avatar of myAvatars) {
             for (const category of avatar.categories) {
                 set.add(category);
             }
         }
 
         return ['All', ...Array.from(set).sort((a, b) => a.localeCompare(b))];
-    }, [tabFiltered]);
+    }, [activeTab, myAvatars, publicAvatarCategories]);
 
     useEffect(() => {
         if (!availableCategories.includes(activeCategory)) {
@@ -325,10 +365,10 @@ export function AvatarsPage() {
         }
     }, [availableCategories, activeCategory]);
 
-    const filteredAvatars = useMemo(() => {
+    const filteredMyAvatars = useMemo(() => {
         const normalizedQuery = query.trim().toLowerCase();
 
-        return tabFiltered.filter((avatar) => {
+        return myAvatars.filter((avatar) => {
             const inCategory = activeCategory === 'All' || avatar.categories.includes(activeCategory);
             if (!inCategory) {
                 return false;
@@ -346,14 +386,18 @@ export function AvatarsPage() {
 
             return haystack.includes(normalizedQuery);
         });
-    }, [tabFiltered, activeCategory, query]);
+    }, [activeCategory, myAvatars, query]);
 
     useEffect(() => {
         setCurrentPage(1);
     }, [activeTab, activeCategory, query]);
 
-    const pageSize = activeTab === 'public' ? 50 : Math.max(filteredAvatars.length, 1);
-    const totalPages = Math.max(1, Math.ceil(filteredAvatars.length / pageSize));
+    const pageSize = 50;
+    const totalPages = activeTab === 'public'
+        ? Math.max(1, publicAvatarLastPage)
+        : Math.max(1, Math.ceil(filteredMyAvatars.length / Math.max(filteredMyAvatars.length, 1)));
+
+    const displayAvatars = activeTab === 'public' ? publicAvatars : filteredMyAvatars;
 
     useEffect(() => {
         if (currentPage > totalPages) {
@@ -361,19 +405,12 @@ export function AvatarsPage() {
         }
     }, [currentPage, totalPages]);
 
-    const paginatedAvatars = useMemo(() => {
-        if (activeTab !== 'public') {
-            return filteredAvatars;
-        }
-
-        const start = (currentPage - 1) * pageSize;
-        return filteredAvatars.slice(start, start + pageSize);
-    }, [activeTab, currentPage, filteredAvatars, pageSize]);
-
-    const pageStart = filteredAvatars.length === 0
+    const pageStart = activeTab !== 'public' || publicAvatarTotal === 0
         ? 0
         : ((currentPage - 1) * pageSize) + 1;
-    const pageEnd = Math.min(currentPage * pageSize, filteredAvatars.length);
+    const pageEnd = activeTab !== 'public'
+        ? filteredMyAvatars.length
+        : Math.min(currentPage * pageSize, publicAvatarTotal);
 
     const canSubmitDigitalTwin = useMemo(() => (
         !submittingTwin
@@ -426,11 +463,16 @@ export function AvatarsPage() {
                         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Avatar Gallery</p>
                         <h2 className="mt-1 text-2xl text-slate-900">Browse and Use HeyGen Avatars</h2>
                         <p className="mt-2 text-sm text-slate-600">
-                            Explore available avatars, filter by category, and pick one for your video or live workflow.
+                            Explore the locally synced public catalog and your completed avatars without waiting on HeyGen.
                         </p>
+                        {publicAvatarLastSyncedAt ? (
+                            <p className="mt-2 text-xs font-medium uppercase tracking-[0.12em] text-slate-400">
+                                Public catalog synced {formatDateTime(publicAvatarLastSyncedAt)}
+                            </p>
+                        ) : null}
                     </div>
 
-                    <button type="button" onClick={() => void loadCatalog()} className="btn-secondary">
+                    <button type="button" onClick={() => void Promise.all([loadPublicAvatars(), loadDigitalTwins()])} className="btn-secondary">
                         Refresh
                     </button>
                 </div>
@@ -503,7 +545,7 @@ export function AvatarsPage() {
                             />
                         ))}
                     </div>
-                ) : filteredAvatars.length === 0 ? (
+                ) : displayAvatars.length === 0 ? (
                     <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-10 text-center">
                         <p className="text-sm font-semibold text-slate-900">No avatars found</p>
                         <p className="mt-1 text-sm text-slate-600">
@@ -512,7 +554,7 @@ export function AvatarsPage() {
                     </div>
                 ) : (
                     <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                        {paginatedAvatars.map((avatar) => (
+                        {displayAvatars.map((avatar) => (
                             <article key={avatar.id} className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-100 shadow-sm">
                                 <div className="relative aspect-[3/4]">
                                     {avatar.previewUrl ? (
@@ -552,12 +594,12 @@ export function AvatarsPage() {
                     </div>
                 )}
 
-                {activeTab === 'public' && filteredAvatars.length > 50 ? (
+                {activeTab === 'public' && publicAvatarTotal > pageSize ? (
                     <div className="mt-5 flex flex-col gap-3 border-t border-slate-200/90 pt-4 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-sm text-slate-600">
                             Showing <span className="font-semibold text-slate-900">{pageStart}</span>-
                             <span className="font-semibold text-slate-900">{pageEnd}</span> of{' '}
-                            <span className="font-semibold text-slate-900">{filteredAvatars.length}</span> public avatars
+                            <span className="font-semibold text-slate-900">{publicAvatarTotal}</span> public avatars
                         </p>
 
                         <div className="flex items-center gap-2">
@@ -673,7 +715,7 @@ export function AvatarsPage() {
                             <a className="btn-secondary" href={PHOTO_AVATAR_DOC_URL} target="_blank" rel="noreferrer">
                                 Photo Avatar Docs
                             </a>
-                            <button type="button" className="btn-secondary" onClick={() => void loadCatalog()}>
+                            <button type="button" className="btn-secondary" onClick={() => void loadPublicAvatars()}>
                                 Refresh avatar catalog
                             </button>
                         </div>
