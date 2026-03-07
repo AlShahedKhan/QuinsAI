@@ -3,6 +3,7 @@
 namespace App\Http\Resources\HeyGen;
 
 use App\Models\HeyGenPublicAvatar;
+use Illuminate\Support\Arr;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,6 +20,7 @@ class PublicAvatarResource extends JsonResource
             'display_name' => $this->name,
             'name' => $this->name,
             'preview_image_url' => $this->preview_image_url,
+            'preview_video_url' => Arr::get($this->provider_payload ?? [], 'preview_video_url'),
             'looks' => $this->looks_count,
             'categories' => $this->categories ?? [],
             'is_public' => true,

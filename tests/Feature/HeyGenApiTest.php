@@ -135,6 +135,9 @@ test('public avatars endpoint returns paginated local avatar catalog', function 
         'looks_count' => 15,
         'categories' => ['Professional'],
         'search_text' => 'annie avatar_annie professional',
+        'provider_payload' => [
+            'preview_video_url' => 'https://cdn.example.com/annie.mp4',
+        ],
         'is_active' => true,
         'synced_at' => now(),
     ]);
@@ -150,6 +153,7 @@ test('public avatars endpoint returns paginated local avatar catalog', function 
         ->assertOk()
         ->assertJsonPath('data.0.avatar_id', 'avatar_annie')
         ->assertJsonPath('data.0.display_name', 'Annie')
+        ->assertJsonPath('data.0.preview_video_url', 'https://cdn.example.com/annie.mp4')
         ->assertJsonPath('total', 1)
         ->assertJsonPath('meta.categories.0', 'Professional');
 });

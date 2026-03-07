@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { FormNotice } from '../components/ui/FormNotice';
 import { heygenApi } from '../lib/heygenApi';
@@ -11,6 +11,7 @@ type AvatarCard = {
     id: string;
     name: string;
     previewUrl: string | null;
+    previewVideoUrl: string | null;
     visibility: AvatarVisibility;
     looks: number | null;
     categories: string[];
@@ -143,6 +144,11 @@ function normalizeAvatar(item: CatalogItem, currentUserId: number | null): Avata
         'photo_url',
         'cover_url',
     ]);
+    const previewVideoUrl = readFirstString(raw, [
+        'preview_video_url',
+        'video_preview_url',
+        'video_url',
+    ]);
 
     const looks = readFirstNumber(raw, ['looks', 'looks_count', 'look_count']);
 
@@ -160,6 +166,7 @@ function normalizeAvatar(item: CatalogItem, currentUserId: number | null): Avata
         id,
         name,
         previewUrl,
+        previewVideoUrl,
         looks,
         categories,
         visibility: resolveVisibility(raw, currentUserId),
@@ -177,6 +184,7 @@ function normalizeDigitalTwinAvatar(item: DigitalTwinDto): AvatarCard | null {
         id,
         name: item.avatar_name,
         previewUrl: item.preview_image_url,
+        previewVideoUrl: item.preview_video_url,
         visibility: 'my',
         looks: null,
         categories: ['Digital Twin'],
@@ -249,6 +257,8 @@ export function AvatarsPage() {
     const [consentVideo, setConsentVideo] = useState<File | null>(null);
     const [submittingTwin, setSubmittingTwin] = useState(false);
     const [uploadInputKey, setUploadInputKey] = useState(0);
+    const [previewingAvatarId, setPreviewingAvatarId] = useState<string | null>(null);
+    const previewDelayTimeoutRef = useRef<number | null>(null);
 
     const currentUserId = state.user?.id ?? null;
 
@@ -419,6 +429,49 @@ export function AvatarsPage() {
         && consentVideo !== null
     ), [submittingTwin, avatarName, trainingFootage, consentVideo]);
 
+    useEffect(() => {
+        return () => {
+            if (previewDelayTimeoutRef.current !== null) {
+                window.clearTimeout(previewDelayTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const clearPreviewDelay = useCallback(() => {
+        if (previewDelayTimeoutRef.current === null) {
+            return;
+        }
+
+        window.clearTimeout(previewDelayTimeoutRef.current);
+        previewDelayTimeoutRef.current = null;
+    }, []);
+
+    const scheduleAvatarPreview = useCallback((avatarId: string, previewVideoUrl: string | null) => {
+        clearPreviewDelay();
+
+        if (!previewVideoUrl) {
+            setPreviewingAvatarId(null);
+            return;
+        }
+
+        previewDelayTimeoutRef.current = window.setTimeout(() => {
+            setPreviewingAvatarId(avatarId);
+            previewDelayTimeoutRef.current = null;
+        }, 180);
+    }, [clearPreviewDelay]);
+
+    const stopAvatarPreview = useCallback((avatarId?: string) => {
+        clearPreviewDelay();
+
+        setPreviewingAvatarId((current) => {
+            if (avatarId && current !== avatarId) {
+                return current;
+            }
+
+            return null;
+        });
+    }, [clearPreviewDelay]);
+
     async function handleDigitalTwinSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!canSubmitDigitalTwin) {
@@ -554,14 +607,27 @@ export function AvatarsPage() {
                     </div>
                 ) : (
                     <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                        {displayAvatars.map((avatar) => (
-                            <article key={avatar.id} className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-100 shadow-sm">
+                        {displayAvatars.map((avatar) => {
+                            const isPreviewing = previewingAvatarId === avatar.id && avatar.previewVideoUrl !== null;
+
+                            return (
+                            <article
+                                key={avatar.id}
+                                tabIndex={avatar.previewVideoUrl ? 0 : -1}
+                                className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-100 shadow-sm"
+                                onMouseEnter={() => scheduleAvatarPreview(avatar.id, avatar.previewVideoUrl)}
+                                onMouseLeave={() => stopAvatarPreview(avatar.id)}
+                                onFocus={() => scheduleAvatarPreview(avatar.id, avatar.previewVideoUrl)}
+                                onBlur={() => stopAvatarPreview(avatar.id)}
+                            >
                                 <div className="relative aspect-[3/4]">
                                     {avatar.previewUrl ? (
                                         <img
                                             src={avatar.previewUrl}
                                             alt={avatar.name}
-                                            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                                            className={isPreviewing
+                                                ? 'h-full w-full object-cover opacity-0 transition duration-200'
+                                                : 'h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]'}
                                             loading="lazy"
                                         />
                                     ) : (
@@ -571,6 +637,26 @@ export function AvatarsPage() {
                                             </span>
                                         </div>
                                     )}
+
+                                    {isPreviewing ? (
+                                        <video
+                                            key={`${avatar.id}-preview`}
+                                            className="absolute inset-0 h-full w-full object-cover"
+                                            src={avatar.previewVideoUrl ?? undefined}
+                                            autoPlay
+                                            muted
+                                            loop
+                                            playsInline
+                                            preload="none"
+                                            poster={avatar.previewUrl ?? undefined}
+                                        />
+                                    ) : null}
+
+                                    {avatar.previewVideoUrl ? (
+                                        <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-slate-950/62 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
+                                            {isPreviewing ? 'Previewing' : 'Hover to preview'}
+                                        </div>
+                                    ) : null}
 
                                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/84 via-slate-900/28 to-transparent p-4 text-white">
                                         <p className="text-base font-semibold">{avatar.name}</p>
@@ -590,7 +676,8 @@ export function AvatarsPage() {
                                     </div>
                                 </div>
                             </article>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
 

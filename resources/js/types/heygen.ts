@@ -61,6 +61,7 @@ export type CatalogItem = {
     name?: string;
     display_name?: string;
     preview_image_url?: string;
+    preview_video_url?: string;
     [key: string]: unknown;
 };
 
