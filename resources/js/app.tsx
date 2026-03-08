@@ -146,6 +146,7 @@ function ShellLayout({ children, eyebrow, title, navGroups, contextLink }: Shell
                                     <NavLink
                                         key={item.to}
                                         to={item.to}
+                                        end
                                         className={({ isActive }) => (
                                             `rounded-lg px-3 py-2 text-sm font-semibold transition ${isActive
                                                 ? 'bg-slate-900 text-white shadow-[0_12px_22px_-12px_rgba(15,23,42,0.9)]'
