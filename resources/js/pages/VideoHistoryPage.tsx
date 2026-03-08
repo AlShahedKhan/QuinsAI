@@ -1,13 +1,8 @@
-﻿import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FormNotice } from '../components/ui/FormNotice';
+import { useVideoPolling } from '../hooks/useVideoPolling';
+import { heygenApi } from '../lib/heygenApi';
 import type { VideoJobDto } from '../types/heygen';
-
-type Props = {
-    jobs: VideoJobDto[];
-    loading: boolean;
-    error: string | null;
-    onRefresh: () => Promise<void>;
-};
 
 function statusClass(status: VideoJobDto['status']): string {
     switch (status) {
@@ -36,7 +31,32 @@ function formatDateTime(value: string | null): string {
     }).format(date);
 }
 
-export function VideoHistoryPage({ jobs, loading, error, onRefresh }: Props) {
+export function VideoHistoryPage() {
+    const [jobs, setJobs] = useState<VideoJobDto[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const loadJobs = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await heygenApi.listVideos();
+            setJobs(response.data);
+        } catch (err) {
+            const normalized = err instanceof Error ? err : new Error('Failed to load video jobs.');
+            setError(normalized.message);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadJobs();
+    }, [loadJobs]);
+
+    useVideoPolling(jobs, loadJobs);
+
     const stats = useMemo(() => {
         return jobs.reduce(
             (acc, job) => {
@@ -69,7 +89,7 @@ export function VideoHistoryPage({ jobs, loading, error, onRefresh }: Props) {
                     <button
                         type="button"
                         onClick={() => {
-                            void onRefresh();
+                            void loadJobs();
                         }}
                         className="btn-secondary"
                     >

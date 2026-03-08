@@ -7,8 +7,6 @@ import { AuthProvider, canAccessAdmin, getAdminLandingPath, getDefaultAuthentica
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { PublicOnlyRoute } from './auth/PublicOnlyRoute';
 import { AdminRoute } from './auth/AdminRoute';
-import { heygenApi } from './lib/heygenApi';
-import { useVideoPolling } from './hooks/useVideoPolling';
 import { VideoGeneratorPage } from './pages/VideoGeneratorPage';
 import { VideoAgentPage } from './pages/VideoAgentPage';
 import { VideoHistoryPage } from './pages/VideoHistoryPage';
@@ -22,7 +20,7 @@ import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { PublicAvatarCatalogAdminPage } from './pages/admin/PublicAvatarCatalogAdminPage';
 import { RolesAdminPage } from './pages/admin/RolesAdminPage';
 import { PermissionsAdminPage } from './pages/admin/PermissionsAdminPage';
-import type { AuthUserDto, VideoJobDto } from './types/heygen';
+import type { AuthUserDto } from './types/heygen';
 
 const userNavGroups = [
     {
@@ -171,8 +169,6 @@ function ShellLayout({ children, eyebrow, title, navGroups, contextLink }: Shell
 }
 
 function UserLayout({ children }: { children: React.ReactNode }) {
-    const { state } = useAuth();
-
     return (
         <ShellLayout
             eyebrow="QuinsAI Workspace"
@@ -181,9 +177,6 @@ function UserLayout({ children }: { children: React.ReactNode }) {
                 label: group.label,
                 items: [...group.items],
             }))}
-            contextLink={canAccessAdmin(state.user)
-                ? { to: getAdminLandingPath(state.user) ?? '/admin/avatar-catalog', label: 'Admin Portal' }
-                : undefined}
         >
             {children}
         </ShellLayout>
@@ -207,41 +200,6 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 
 function AppRouter() {
     const { state } = useAuth();
-    const [jobs, setJobs] = React.useState<VideoJobDto[]>([]);
-    const [loadingJobs, setLoadingJobs] = React.useState(false);
-    const [jobsError, setJobsError] = React.useState<string | null>(null);
-
-    const loadJobs = React.useCallback(async () => {
-        setLoadingJobs(true);
-        setJobsError(null);
-
-        try {
-            const response = await heygenApi.listVideos();
-            setJobs(response.data);
-        } catch (error) {
-            const normalized = error instanceof Error ? error : new Error('Failed to load video jobs.');
-            setJobsError(normalized.message);
-        } finally {
-            setLoadingJobs(false);
-        }
-    }, []);
-
-    React.useEffect(() => {
-        if (state.status === 'authenticated') {
-            void loadJobs();
-            return;
-        }
-
-        setJobs([]);
-        setJobsError(null);
-    }, [loadJobs, state]);
-
-    useVideoPolling(jobs, loadJobs);
-
-    async function handleVideoCreated(video: VideoJobDto): Promise<void> {
-        setJobs((prev) => [video, ...prev]);
-        await loadJobs();
-    }
 
     const defaultHome = resolveHomePath(state.user);
     const legacyVideoAgentRedirect = canAccessAdmin(state.user) ? '/admin/video-agent' : '/videos/generate';
@@ -272,7 +230,7 @@ function AppRouter() {
                 element={(
                     <ProtectedRoute>
                         <UserLayout>
-                            <VideoGeneratorPage onVideoCreated={handleVideoCreated} />
+                            <VideoGeneratorPage />
                         </UserLayout>
                     </ProtectedRoute>
                 )}
@@ -290,7 +248,7 @@ function AppRouter() {
                 element={(
                     <ProtectedRoute>
                         <UserLayout>
-                            <VideoHistoryPage jobs={jobs} loading={loadingJobs} error={jobsError} onRefresh={loadJobs} />
+                            <VideoHistoryPage />
                         </UserLayout>
                     </ProtectedRoute>
                 )}
