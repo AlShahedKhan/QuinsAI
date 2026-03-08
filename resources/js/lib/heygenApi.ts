@@ -42,7 +42,7 @@ export const heygenApi = {
 
     async createVideoAgent(input: CreateVideoAgentInput): Promise<{ data: VideoAgentJobDto; quota: Record<string, number> }> {
         try {
-            const response = await apiClient.post<{ data: VideoAgentJobDto; quota: Record<string, number> }>('/api/heygen/video-agent/videos', input);
+            const response = await apiClient.post<{ data: VideoAgentJobDto; quota: Record<string, number> }>('/api/admin/heygen/video-agent/videos', input);
             return response.data;
         } catch (error) {
             throw toApiError(error);
@@ -122,7 +122,7 @@ export const heygenApi = {
 
     async listVideoAgentVideos(page = 1): Promise<Paginated<VideoAgentJobDto>> {
         try {
-            const response = await apiClient.get<Paginated<VideoAgentJobDto>>('/api/heygen/video-agent/videos', { params: { page } });
+            const response = await apiClient.get<Paginated<VideoAgentJobDto>>('/api/admin/heygen/video-agent/videos', { params: { page } });
             return response.data;
         } catch (error) {
             throw toApiError(error);
@@ -131,7 +131,7 @@ export const heygenApi = {
 
     async getVideoAgentVideo(id: number): Promise<VideoAgentJobDto> {
         try {
-            const response = await apiClient.get<{ data: VideoAgentJobDto }>(`/api/heygen/video-agent/videos/${id}`);
+            const response = await apiClient.get<{ data: VideoAgentJobDto }>(`/api/admin/heygen/video-agent/videos/${id}`);
             return response.data.data;
         } catch (error) {
             throw toApiError(error);

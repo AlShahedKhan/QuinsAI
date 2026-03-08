@@ -1,6 +1,6 @@
 ﻿import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getAdminLandingPath, useAuth } from '../../auth/AuthContext';
+import { getUserLandingPath, useAuth } from '../../auth/AuthContext';
 import { AuthPanel } from '../../components/ui/AuthPanel';
 import { AuthTextField } from '../../components/ui/AuthTextField';
 import { FormNotice } from '../../components/ui/FormNotice';
@@ -21,7 +21,7 @@ export function LoginPage() {
 
         try {
             const user = await login({ email, password });
-            navigate(getAdminLandingPath(user) ?? '/videos/generate', { replace: true });
+            navigate(getUserLandingPath(user), { replace: true });
         } catch (err) {
             const normalized = err instanceof Error ? err : new Error('Login failed.');
             setError(normalized.message);

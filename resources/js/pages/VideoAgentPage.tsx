@@ -122,10 +122,10 @@ export function VideoAgentPage() {
             <article className="surface-card page-enter p-6 sm:p-7">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Prompt To Video</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Prompt To Video</p>
                         <h2 className="mt-1 text-2xl text-slate-900">HeyGen Video Agent</h2>
                         <p className="mt-2 max-w-2xl text-sm text-slate-600">
-                            Submit a single prompt and let HeyGen compose the scene, speech, and final render. Jobs run asynchronously and complete through webhook updates with polling fallback.
+                            Internal prompt-to-video workflow for admins and operators. Jobs run asynchronously and complete through webhook updates with polling fallback.
                         </p>
                     </div>
 

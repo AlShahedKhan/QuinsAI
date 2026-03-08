@@ -214,3 +214,11 @@ export function getAdminLandingPath(user: AuthUserDto | null): string | null {
 
     return '/admin/avatar-catalog';
 }
+
+export function getUserLandingPath(_user: AuthUserDto | null): string {
+    return '/videos/generate';
+}
+
+export function getDefaultAuthenticatedPath(user: AuthUserDto | null): string {
+    return getAdminLandingPath(user) ?? getUserLandingPath(user);
+}

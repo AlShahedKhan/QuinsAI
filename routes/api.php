@@ -51,9 +51,6 @@ Route::middleware(['auth:sanctum', 'throttle:heygen-read'])->prefix('heygen')->g
     Route::get('/videos', [VideoController::class, 'index']);
     Route::get('/videos/{videoJob}', [VideoController::class, 'show']);
     Route::post('/videos', [VideoController::class, 'store'])->middleware('throttle:heygen-write');
-    Route::get('/video-agent/videos', [VideoAgentController::class, 'index']);
-    Route::get('/video-agent/videos/{videoAgentJob}', [VideoAgentController::class, 'show']);
-    Route::post('/video-agent/videos', [VideoAgentController::class, 'store'])->middleware('throttle:heygen-write');
 
     Route::get('/digital-twins', [DigitalTwinController::class, 'index']);
     Route::get('/digital-twins/{digitalTwin}', [DigitalTwinController::class, 'show']);
@@ -66,6 +63,9 @@ Route::middleware(['auth:sanctum', 'throttle:heygen-read'])->prefix('heygen')->g
 Route::middleware(['auth:sanctum', 'throttle:admin-security'])->prefix('admin')->group(function (): void {
     Route::get('/heygen/public-avatars', [AdminPublicAvatarCatalogController::class, 'show'])->middleware('admin.access');
     Route::post('/heygen/public-avatars/sync', [AdminPublicAvatarCatalogController::class, 'sync'])->middleware('admin.access');
+    Route::get('/heygen/video-agent/videos', [VideoAgentController::class, 'index'])->middleware('admin.access');
+    Route::get('/heygen/video-agent/videos/{videoAgentJob}', [VideoAgentController::class, 'show'])->middleware('admin.access');
+    Route::post('/heygen/video-agent/videos', [VideoAgentController::class, 'store'])->middleware(['admin.access', 'throttle:heygen-write']);
 
     Route::get('/roles', [AdminRoleController::class, 'index'])->middleware('permission:roles.view');
     Route::post('/roles', [AdminRoleController::class, 'store'])->middleware('permission:roles.create');

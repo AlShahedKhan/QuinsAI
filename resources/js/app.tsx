@@ -2,8 +2,8 @@ import './bootstrap';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import '../css/app.css';
-import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { AuthProvider, canAccessAdmin, getAdminLandingPath, hasPermission, useAuth } from './auth/AuthContext';
+import { BrowserRouter, Link, NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { AuthProvider, canAccessAdmin, getAdminLandingPath, getDefaultAuthenticatedPath, hasPermission, useAuth } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { PublicOnlyRoute } from './auth/PublicOnlyRoute';
 import { AdminRoute } from './auth/AdminRoute';
@@ -24,38 +24,60 @@ import { RolesAdminPage } from './pages/admin/RolesAdminPage';
 import { PermissionsAdminPage } from './pages/admin/PermissionsAdminPage';
 import type { AuthUserDto, VideoJobDto } from './types/heygen';
 
-const coreNavItems = [
-    { to: '/avatars', label: 'Avatars' },
-    { to: '/videos/generate', label: 'Generate' },
-    { to: '/video-agent', label: 'Video Agent' },
-    { to: '/videos', label: 'History' },
-    { to: '/live', label: 'Live Avatar' },
+const userNavGroups = [
+    {
+        label: 'Workspace',
+        items: [
+            { to: '/avatars', label: 'Avatars' },
+            { to: '/videos/generate', label: 'Generate' },
+            { to: '/videos', label: 'History' },
+            { to: '/live', label: 'Live Avatar' },
+        ],
+    },
 ] as const;
 
+const adminOpsItems = [
+    { to: '/admin/avatar-catalog', label: 'Avatar Catalog' },
+    { to: '/admin/video-agent', label: 'Video Agent' },
+] as const;
+
+const legacyVideoAgentPath = '/video-agent';
+
 type NavLinkItem = { to: string; label: string };
-type AdminNavGroup = { label: string; items: NavLinkItem[] };
+type NavGroup = { label: string; items: NavLinkItem[] };
+
+type ShellLayoutProps = {
+    children: React.ReactNode;
+    eyebrow: string;
+    title: string;
+    navGroups: NavGroup[];
+    contextLink?: {
+        to: string;
+        label: string;
+    };
+};
 
 function resolveHomePath(user: AuthUserDto | null): string {
-    return getAdminLandingPath(user) ?? '/videos/generate';
+    return getDefaultAuthenticatedPath(user);
 }
 
-function buildAdminNavGroups(user: AuthUserDto | null): AdminNavGroup[] {
-    const groups: AdminNavGroup[] = [];
+function buildAdminNavGroups(user: AuthUserDto | null): NavGroup[] {
+    const groups: NavGroup[] = [];
     const securityItems: NavLinkItem[] = [];
 
     if (canAccessAdmin(user)) {
-        if (hasPermission(user, 'roles.view')) {
-            securityItems.push({ to: '/admin/roles', label: 'Roles' });
-        }
-
-        if (hasPermission(user, 'permissions.view')) {
-            securityItems.push({ to: '/admin/permissions', label: 'Permissions' });
-        }
-
         groups.push({
-            label: 'HeyGen Admin',
-            items: [{ to: '/admin/avatar-catalog', label: 'Avatar Catalog' }],
+            label: 'Operations',
+            items: [...adminOpsItems],
         });
+    }
+
+    if (hasPermission(user, 'roles.view')) {
+        securityItems.push({ to: '/admin/roles', label: 'Roles' });
+    }
+
+    if (hasPermission(user, 'permissions.view')) {
+        securityItems.push({ to: '/admin/permissions', label: 'Permissions' });
     }
 
     if (securityItems.length > 0) {
@@ -68,9 +90,8 @@ function buildAdminNavGroups(user: AuthUserDto | null): AdminNavGroup[] {
     return groups;
 }
 
-function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
+function ShellLayout({ children, eyebrow, title, navGroups, contextLink }: ShellLayoutProps) {
     const { state, logout } = useAuth();
-    const adminNavGroups = React.useMemo(() => buildAdminNavGroups(state.user), [state.user]);
 
     return (
         <main className="app-shell">
@@ -81,11 +102,17 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             <header className="glass-header">
                 <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">QuinsAI Platform</p>
-                        <h1 className="mt-1 text-2xl text-slate-900">HeyGen Operations Hub</h1>
+                        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">{eyebrow}</p>
+                        <h1 className="mt-1 text-2xl text-slate-900">{title}</h1>
                     </div>
 
                     <div className="flex items-center gap-3 self-end sm:self-auto">
+                        {contextLink ? (
+                            <Link to={contextLink.to} className="btn-ghost">
+                                {contextLink.label}
+                            </Link>
+                        ) : null}
+
                         <div className="rounded-xl border border-slate-200/90 bg-white/70 px-3 py-2 text-right backdrop-blur">
                             <p className="text-sm font-semibold text-slate-900">{state.user?.name ?? 'User'}</p>
                             <p className="text-xs text-slate-500">{state.user?.email}</p>
@@ -108,30 +135,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                 <aside className="rounded-3xl border border-slate-200/90 bg-white/80 p-4 shadow-sm backdrop-blur lg:sticky lg:top-6">
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Navigation</p>
 
-                    <div className="mt-4 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-3">
-                        <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                            Core
-                        </p>
-
-                        <div className="flex flex-col gap-1">
-                            {coreNavItems.map((item) => (
-                                <NavLink
-                                    key={item.to}
-                                    to={item.to}
-                                    className={({ isActive }) => (
-                                        `rounded-lg px-3 py-2 text-sm font-semibold transition ${isActive
-                                            ? 'bg-slate-900 text-white shadow-[0_12px_22px_-12px_rgba(15,23,42,0.9)]'
-                                            : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                                        }`
-                                    )}
-                                >
-                                    {item.label}
-                                </NavLink>
-                            ))}
-                        </div>
-                    </div>
-
-                    {adminNavGroups.map((group) => (
+                    {navGroups.map((group) => (
                         <div key={group.label} className="mt-4 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-3">
                             <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                                 {group.label}
@@ -162,6 +166,41 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                 </div>
             </section>
         </main>
+    );
+}
+
+function UserLayout({ children }: { children: React.ReactNode }) {
+    const { state } = useAuth();
+
+    return (
+        <ShellLayout
+            eyebrow="QuinsAI Workspace"
+            title="User Workspace"
+            navGroups={userNavGroups.map((group) => ({
+                label: group.label,
+                items: [...group.items],
+            }))}
+            contextLink={canAccessAdmin(state.user)
+                ? { to: getAdminLandingPath(state.user) ?? '/admin/avatar-catalog', label: 'Admin Portal' }
+                : undefined}
+        >
+            {children}
+        </ShellLayout>
+    );
+}
+
+function AdminLayout({ children }: { children: React.ReactNode }) {
+    const { state } = useAuth();
+
+    return (
+        <ShellLayout
+            eyebrow="QuinsAI Administration"
+            title="Admin Console"
+            navGroups={buildAdminNavGroups(state.user)}
+            contextLink={{ to: '/videos/generate', label: 'Open User App' }}
+        >
+            {children}
+        </ShellLayout>
     );
 }
 
@@ -204,6 +243,8 @@ function AppRouter() {
     }
 
     const defaultHome = resolveHomePath(state.user);
+    const legacyVideoAgentRedirect = canAccessAdmin(state.user) ? '/admin/video-agent' : '/videos/generate';
+    const adminHome = getAdminLandingPath(state.user) ?? '/admin/avatar-catalog';
 
     return (
         <Routes>
@@ -219,9 +260,9 @@ function AppRouter() {
                 path="/avatars"
                 element={(
                     <ProtectedRoute>
-                        <AuthenticatedLayout>
+                        <UserLayout>
                             <AvatarsPage />
-                        </AuthenticatedLayout>
+                        </UserLayout>
                     </ProtectedRoute>
                 )}
             />
@@ -229,19 +270,17 @@ function AppRouter() {
                 path="/videos/generate"
                 element={(
                     <ProtectedRoute>
-                        <AuthenticatedLayout>
+                        <UserLayout>
                             <VideoGeneratorPage onVideoCreated={handleVideoCreated} />
-                        </AuthenticatedLayout>
+                        </UserLayout>
                     </ProtectedRoute>
                 )}
             />
             <Route
-                path="/video-agent"
+                path={legacyVideoAgentPath}
                 element={(
                     <ProtectedRoute>
-                        <AuthenticatedLayout>
-                            <VideoAgentPage />
-                        </AuthenticatedLayout>
+                        <Navigate to={legacyVideoAgentRedirect} replace />
                     </ProtectedRoute>
                 )}
             />
@@ -249,9 +288,9 @@ function AppRouter() {
                 path="/videos"
                 element={(
                     <ProtectedRoute>
-                        <AuthenticatedLayout>
+                        <UserLayout>
                             <VideoHistoryPage jobs={jobs} loading={loadingJobs} error={jobsError} onRefresh={loadJobs} />
-                        </AuthenticatedLayout>
+                        </UserLayout>
                     </ProtectedRoute>
                 )}
             />
@@ -259,42 +298,58 @@ function AppRouter() {
                 path="/live"
                 element={(
                     <ProtectedRoute>
-                        <AuthenticatedLayout>
+                        <UserLayout>
                             <LiveAvatarPage />
-                        </AuthenticatedLayout>
+                        </UserLayout>
                     </ProtectedRoute>
                 )}
             />
 
             <Route
-                path="/admin/avatar-catalog"
+                path="/admin"
                 element={(
                     <AdminRoute>
-                        <AuthenticatedLayout>
-                            <PublicAvatarCatalogAdminPage />
-                        </AuthenticatedLayout>
+                        <Navigate to={adminHome} replace />
                     </AdminRoute>
                 )}
             />
-
+            <Route
+                path="/admin/avatar-catalog"
+                element={(
+                    <AdminRoute>
+                        <AdminLayout>
+                            <PublicAvatarCatalogAdminPage />
+                        </AdminLayout>
+                    </AdminRoute>
+                )}
+            />
+            <Route
+                path="/admin/video-agent"
+                element={(
+                    <AdminRoute>
+                        <AdminLayout>
+                            <VideoAgentPage />
+                        </AdminLayout>
+                    </AdminRoute>
+                )}
+            />
             <Route
                 path="/admin/roles"
                 element={(
                     <AdminRoute requiredPermission="roles.view">
-                        <AuthenticatedLayout>
+                        <AdminLayout>
                             <RolesAdminPage />
-                        </AuthenticatedLayout>
+                        </AdminLayout>
                     </AdminRoute>
                 )}
             />
-
             <Route
                 path="/admin/permissions"
                 element={(
                     <AdminRoute requiredPermission="permissions.view">
-                        <AuthenticatedLayout>
+                        <AdminLayout>
                             <PermissionsAdminPage />
-                        </AuthenticatedLayout>
+                        </AdminLayout>
                     </AdminRoute>
                 )}
             />

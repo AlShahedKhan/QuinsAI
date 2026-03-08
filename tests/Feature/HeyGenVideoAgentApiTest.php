@@ -14,20 +14,38 @@ use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
+function actingAsVideoAgentAdmin(): User
+{
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+    Sanctum::actingAs($admin);
+
+    return $admin;
+}
+
 test('video agent creation endpoint requires auth', function () {
-    $this->postJson('/api/heygen/video-agent/videos', [
+    $this->postJson('/api/admin/heygen/video-agent/videos', [
         'prompt' => 'Create a product launch video for a finance app.',
     ])->assertUnauthorized();
 });
 
-test('authenticated user can queue a heygen video agent job', function () {
-    Queue::fake();
+test('non admin user cannot access video agent endpoints', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
     ]);
     Sanctum::actingAs($user);
 
-    $response = $this->postJson('/api/heygen/video-agent/videos', [
+    $this->postJson('/api/admin/heygen/video-agent/videos', [
+        'prompt' => 'Create a product launch video for a finance app.',
+    ])->assertForbidden();
+});
+
+test('admin can queue a heygen video agent job', function () {
+    Queue::fake();
+    $admin = actingAsVideoAgentAdmin();
+
+    $response = $this->postJson('/api/admin/heygen/video-agent/videos', [
         'prompt' => 'Create a short product launch video for QuinsAI with a confident presenter and clear CTA.',
     ]);
 
@@ -36,15 +54,15 @@ test('authenticated user can queue a heygen video agent job', function () {
 
     $job = HeyGenVideoAgentJob::query()->first();
     expect($job)->not->toBeNull();
-    expect($job?->user_id)->toBe($user->id);
+    expect($job?->user_id)->toBe($admin->id);
     expect($job?->prompt)->toContain('QuinsAI');
 
     Queue::assertPushed(SubmitHeyGenVideoAgentJob::class, 1);
 });
 
 test('video agent detail is scoped to owner', function () {
-    $owner = User::factory()->create(['email_verified_at' => now()]);
-    $other = User::factory()->create(['email_verified_at' => now()]);
+    $owner = User::factory()->admin()->create(['email_verified_at' => now()]);
+    $other = User::factory()->admin()->create(['email_verified_at' => now()]);
 
     $job = HeyGenVideoAgentJob::query()->create([
         'user_id' => $owner->id,
@@ -54,7 +72,7 @@ test('video agent detail is scoped to owner', function () {
 
     Sanctum::actingAs($other);
 
-    $this->getJson("/api/heygen/video-agent/videos/{$job->id}")
+    $this->getJson("/api/admin/heygen/video-agent/videos/{$job->id}")
         ->assertNotFound();
 });
 
@@ -62,14 +80,13 @@ test('video agent requests share the daily heygen video quota', function () {
     Queue::fake();
     config()->set('services.heygen.daily_request_limit', 1);
 
-    $user = User::factory()->create(['email_verified_at' => now()]);
-    Sanctum::actingAs($user);
+    actingAsVideoAgentAdmin();
 
-    $this->postJson('/api/heygen/video-agent/videos', [
+    $this->postJson('/api/admin/heygen/video-agent/videos', [
         'prompt' => 'First agent request.',
     ])->assertAccepted();
 
-    $this->postJson('/api/heygen/video-agent/videos', [
+    $this->postJson('/api/admin/heygen/video-agent/videos', [
         'prompt' => 'Second agent request.',
     ])->assertTooManyRequests();
 });
@@ -78,10 +95,9 @@ test('video agent prompt safety rules are enforced', function () {
     Queue::fake();
     config()->set('services.heygen.video_agent_prompt_blocklist', ['forbidden']);
 
-    $user = User::factory()->create(['email_verified_at' => now()]);
-    Sanctum::actingAs($user);
+    actingAsVideoAgentAdmin();
 
-    $this->postJson('/api/heygen/video-agent/videos', [
+    $this->postJson('/api/admin/heygen/video-agent/videos', [
         'prompt' => 'This prompt contains forbidden content.',
     ])->assertUnprocessable();
 

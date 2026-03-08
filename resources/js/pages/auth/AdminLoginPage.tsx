@@ -21,7 +21,7 @@ export function AdminLoginPage() {
 
         try {
             const user = await loginAdmin({ email, password });
-            navigate(getAdminLandingPath(user) ?? '/videos/generate', { replace: true });
+            navigate(getAdminLandingPath(user) ?? '/admin/avatar-catalog', { replace: true });
         } catch (err) {
             const normalized = err instanceof Error ? err : new Error('Admin login failed.');
             setError(normalized.message);
