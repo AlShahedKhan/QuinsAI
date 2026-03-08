@@ -15,8 +15,8 @@ Artisan::command('inspire', function () {
 
 Artisan::command('heygen:reconcile', function () {
     ReconcileStaleHeyGenJobsJob::dispatch();
-    $this->info('Queued stale HeyGen job reconciliation.');
-})->purpose('Queue reconciliation for non-terminal HeyGen video jobs.');
+    $this->info('Queued stale HeyGen video job reconciliation.');
+})->purpose('Queue reconciliation for non-terminal HeyGen video and video agent jobs.');
 
 Artisan::command('heygen:digital-twins:reconcile', function () {
     ReconcileStaleHeyGenDigitalTwinsJob::dispatch();

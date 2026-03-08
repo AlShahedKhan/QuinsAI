@@ -8,23 +8,42 @@ class HeyGenScriptSafetyService
 {
     public function assertAllowed(string $script): void
     {
-        $trimmed = trim($script);
+        $this->assertAllowedText(
+            value: $script,
+            field: 'script',
+            maxChars: (int) config('services.heygen.script_max_chars', 1500),
+            blocklist: (array) config('services.heygen.script_blocklist', []),
+        );
+    }
+
+    public function assertAllowedPrompt(string $prompt): void
+    {
+        $this->assertAllowedText(
+            value: $prompt,
+            field: 'prompt',
+            maxChars: (int) config('services.heygen.video_agent_prompt_max_chars', 5000),
+            blocklist: (array) config('services.heygen.video_agent_prompt_blocklist', []),
+        );
+    }
+
+    /**
+     * @param  list<string>  $blocklist
+     */
+    private function assertAllowedText(string $value, string $field, int $maxChars, array $blocklist): void
+    {
+        $trimmed = trim($value);
 
         if ($trimmed === '') {
             throw ValidationException::withMessages([
-                'script' => 'Script must not be empty.',
+                $field => ucfirst($field).' must not be empty.',
             ]);
         }
 
-        $maxChars = (int) config('services.heygen.script_max_chars', 1500);
         if (mb_strlen($trimmed) > $maxChars) {
             throw ValidationException::withMessages([
-                'script' => "Script exceeds max length of {$maxChars} characters.",
+                $field => ucfirst($field)." exceeds max length of {$maxChars} characters.",
             ]);
         }
-
-        /** @var list<string> $blocklist */
-        $blocklist = (array) config('services.heygen.script_blocklist', []);
 
         foreach ($blocklist as $term) {
             if ($term === '') {
@@ -33,7 +52,7 @@ class HeyGenScriptSafetyService
 
             if (mb_stripos($trimmed, $term) !== false) {
                 throw ValidationException::withMessages([
-                    'script' => 'Script includes blocked content.',
+                    $field => ucfirst($field).' includes blocked content.',
                 ]);
             }
         }

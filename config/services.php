@@ -56,6 +56,11 @@ return [
             static fn (string $term): string => trim($term),
             explode(',', (string) env('HEYGEN_SCRIPT_BLOCKLIST', ''))
         ))),
+        'video_agent_prompt_max_chars' => (int) env('HEYGEN_VIDEO_AGENT_PROMPT_MAX_CHARS', 5000),
+        'video_agent_prompt_blocklist' => array_values(array_filter(array_map(
+            static fn (string $term): string => trim($term),
+            explode(',', (string) env('HEYGEN_VIDEO_AGENT_PROMPT_BLOCKLIST', (string) env('HEYGEN_SCRIPT_BLOCKLIST', '')))
+        ))),
         'daily_request_limit' => (int) env('HEYGEN_DAILY_REQUEST_LIMIT', 5),
         'digital_twin_daily_request_limit' => (int) env('HEYGEN_DIGITAL_TWIN_DAILY_REQUEST_LIMIT', 1),
         'daily_live_minute_limit' => (int) env('HEYGEN_DAILY_LIVE_MINUTE_LIMIT', 30),

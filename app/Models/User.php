@@ -61,6 +61,14 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<HeyGenVideoAgentJob, $this>
+     */
+    public function heygenVideoAgentJobs(): HasMany
+    {
+        return $this->hasMany(HeyGenVideoAgentJob::class);
+    }
+
+    /**
      * @return HasMany<HeyGenLiveSession, $this>
      */
     public function heygenLiveSessions(): HasMany

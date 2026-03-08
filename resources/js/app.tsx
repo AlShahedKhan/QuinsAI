@@ -10,6 +10,7 @@ import { AdminRoute } from './auth/AdminRoute';
 import { heygenApi } from './lib/heygenApi';
 import { useVideoPolling } from './hooks/useVideoPolling';
 import { VideoGeneratorPage } from './pages/VideoGeneratorPage';
+import { VideoAgentPage } from './pages/VideoAgentPage';
 import { VideoHistoryPage } from './pages/VideoHistoryPage';
 import { LiveAvatarPage } from './pages/LiveAvatarPage';
 import { AvatarsPage } from './pages/AvatarsPage';
@@ -26,6 +27,7 @@ import type { AuthUserDto, VideoJobDto } from './types/heygen';
 const coreNavItems = [
     { to: '/avatars', label: 'Avatars' },
     { to: '/videos/generate', label: 'Generate' },
+    { to: '/video-agent', label: 'Video Agent' },
     { to: '/videos', label: 'History' },
     { to: '/live', label: 'Live Avatar' },
 ] as const;
@@ -229,6 +231,16 @@ function AppRouter() {
                     <ProtectedRoute>
                         <AuthenticatedLayout>
                             <VideoGeneratorPage onVideoCreated={handleVideoCreated} />
+                        </AuthenticatedLayout>
+                    </ProtectedRoute>
+                )}
+            />
+            <Route
+                path="/video-agent"
+                element={(
+                    <ProtectedRoute>
+                        <AuthenticatedLayout>
+                            <VideoAgentPage />
                         </AuthenticatedLayout>
                     </ProtectedRoute>
                 )}

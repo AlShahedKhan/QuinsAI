@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { VideoJobDto } from '../types/heygen';
 
 const ACTIVE_STATUSES = new Set(['queued', 'submitting', 'processing']);
 
-export function useVideoPolling(jobs: VideoJobDto[], onRefresh: () => Promise<void>): void {
+type PollableJob = {
+    status: string;
+};
+
+export function useVideoPolling<T extends PollableJob>(jobs: T[], onRefresh: () => Promise<void>): void {
     const [attempt, setAttempt] = useState(0);
 
     const hasActiveJobs = useMemo(

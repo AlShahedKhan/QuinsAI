@@ -21,6 +21,22 @@ export type VideoJobDto = {
     updated_at: string | null;
 };
 
+export type VideoAgentJobDto = {
+    id: number;
+    prompt: string;
+    status: VideoJobStatus;
+    provider_video_id: string | null;
+    error_code: string | null;
+    error_message: string | null;
+    output_provider_url: string | null;
+    output_storage_url: string | null;
+    submitted_at: string | null;
+    completed_at: string | null;
+    failed_at: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+};
+
 export type LiveSessionDto = {
     id: number;
     provider_session_id: string | null;

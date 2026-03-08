@@ -1,5 +1,5 @@
 import { apiClient, toApiError } from './apiClient';
-import type { CatalogDto, DigitalTwinDto, LiveSessionDto, Paginated, PublicAvatarDetailDto, PublicAvatarListDto, VideoJobDto } from '../types/heygen';
+import type { CatalogDto, DigitalTwinDto, LiveSessionDto, Paginated, PublicAvatarDetailDto, PublicAvatarListDto, VideoAgentJobDto, VideoJobDto } from '../types/heygen';
 
 type CreateVideoInput = {
     avatar_id: string;
@@ -11,6 +11,10 @@ type CreateLiveSessionInput = {
     avatar_id: string;
     voice_id: string;
     quality?: 'low' | 'medium' | 'high';
+};
+
+type CreateVideoAgentInput = {
+    prompt: string;
 };
 
 export const heygenApi = {
@@ -30,6 +34,15 @@ export const heygenApi = {
     async createVideo(input: CreateVideoInput): Promise<{ data: VideoJobDto; quota: Record<string, number> }> {
         try {
             const response = await apiClient.post<{ data: VideoJobDto; quota: Record<string, number> }>('/api/heygen/videos', input);
+            return response.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
+    async createVideoAgent(input: CreateVideoAgentInput): Promise<{ data: VideoAgentJobDto; quota: Record<string, number> }> {
+        try {
+            const response = await apiClient.post<{ data: VideoAgentJobDto; quota: Record<string, number> }>('/api/heygen/video-agent/videos', input);
             return response.data;
         } catch (error) {
             throw toApiError(error);
@@ -101,6 +114,24 @@ export const heygenApi = {
     async getVideo(id: number): Promise<VideoJobDto> {
         try {
             const response = await apiClient.get<{ data: VideoJobDto }>(`/api/heygen/videos/${id}`);
+            return response.data.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
+    async listVideoAgentVideos(page = 1): Promise<Paginated<VideoAgentJobDto>> {
+        try {
+            const response = await apiClient.get<Paginated<VideoAgentJobDto>>('/api/heygen/video-agent/videos', { params: { page } });
+            return response.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
+    async getVideoAgentVideo(id: number): Promise<VideoAgentJobDto> {
+        try {
+            const response = await apiClient.get<{ data: VideoAgentJobDto }>(`/api/heygen/video-agent/videos/${id}`);
             return response.data.data;
         } catch (error) {
             throw toApiError(error);

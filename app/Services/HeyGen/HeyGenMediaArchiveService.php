@@ -2,6 +2,7 @@
 
 namespace App\Services\HeyGen;
 
+use App\Models\HeyGenVideoAgentJob;
 use App\Models\HeyGenVideoJob;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -9,7 +10,7 @@ use Illuminate\Support\Str;
 
 class HeyGenMediaArchiveService
 {
-    public function archive(HeyGenVideoJob $videoJob): void
+    public function archive(HeyGenVideoJob|HeyGenVideoAgentJob $videoJob): void
     {
         $sourceUrl = $videoJob->output_provider_url;
 

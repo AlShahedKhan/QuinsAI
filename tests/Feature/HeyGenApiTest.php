@@ -2,6 +2,9 @@
 
 use App\Jobs\ProcessHeyGenWebhookEventJob;
 use App\Jobs\SubmitHeyGenVideoJob;
+use App\Domain\HeyGen\HeyGenDigitalTwinWorkflowService;
+use App\Domain\HeyGen\HeyGenVideoAgentWorkflowService;
+use App\Domain\HeyGen\HeyGenVideoWorkflowService;
 use App\Models\HeyGenPublicAvatar;
 use App\Models\HeyGenVideoJob;
 use App\Models\HeyGenWebhookEvent;
@@ -238,4 +241,45 @@ test('webhook is idempotent and only queues processing once', function () {
 
     expect(HeyGenWebhookEvent::query()->count())->toBe(1);
     Queue::assertPushed(ProcessHeyGenWebhookEventJob::class, 1);
+});
+
+test('avatar video success webhook payload with event_data marks job completed', function () {
+    Queue::fake();
+
+    $videoJob = HeyGenVideoJob::query()->create([
+        'user_id' => User::factory()->create()->id,
+        'provider_video_id' => 'provider-video-evt-data',
+        'avatar_id' => 'avatar_1',
+        'voice_id' => 'voice_1',
+        'script' => 'Webhook event_data test',
+        'status' => 'processing',
+    ]);
+
+    $event = HeyGenWebhookEvent::query()->create([
+        'provider_event_id' => 'evt_avatar_success',
+        'event_type' => 'avatar_video.success',
+        'signature_valid' => true,
+        'payload' => [
+            'event_id' => 'evt_avatar_success',
+            'event_type' => 'avatar_video.success',
+            'event_data' => [
+                'video_id' => 'provider-video-evt-data',
+                'url' => 'https://cdn.example.com/avatar-video.mp4',
+            ],
+        ],
+        'received_at' => now(),
+    ]);
+
+    (new ProcessHeyGenWebhookEventJob($event->id))->handle(
+        app(HeyGenVideoWorkflowService::class),
+        app(HeyGenDigitalTwinWorkflowService::class),
+        app(HeyGenVideoAgentWorkflowService::class),
+    );
+
+    $videoJob->refresh();
+    $event->refresh();
+
+    expect($videoJob->status->value)->toBe('completed');
+    expect($videoJob->output_provider_url)->toBe('https://cdn.example.com/avatar-video.mp4');
+    expect($event->processing_error)->toBeNull();
 });

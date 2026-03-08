@@ -17,6 +17,15 @@ class HeyGenClient
     }
 
     /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function generateVideoAgent(array $payload): array
+    {
+        return $this->request('post', '/v1/video_agent/generate', $payload);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function getVideoStatus(string $providerVideoId): array
