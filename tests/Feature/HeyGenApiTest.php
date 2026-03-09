@@ -67,6 +67,56 @@ test('video detail is scoped to owner', function () {
         ->assertNotFound();
 });
 
+test('video index supports status filters and returns overall stats', function () {
+    $user = User::factory()->create(['email_verified_at' => now()]);
+    $other = User::factory()->create(['email_verified_at' => now()]);
+
+    HeyGenVideoJob::query()->create([
+        'user_id' => $user->id,
+        'avatar_id' => 'avatar_1',
+        'voice_id' => 'voice_1',
+        'script' => 'Completed video',
+        'status' => 'completed',
+    ]);
+
+    HeyGenVideoJob::query()->create([
+        'user_id' => $user->id,
+        'avatar_id' => 'avatar_2',
+        'voice_id' => 'voice_2',
+        'script' => 'Processing video',
+        'status' => 'processing',
+    ]);
+
+    HeyGenVideoJob::query()->create([
+        'user_id' => $user->id,
+        'avatar_id' => 'avatar_3',
+        'voice_id' => 'voice_3',
+        'script' => 'Failed video',
+        'status' => 'failed',
+    ]);
+
+    HeyGenVideoJob::query()->create([
+        'user_id' => $other->id,
+        'avatar_id' => 'avatar_4',
+        'voice_id' => 'voice_4',
+        'script' => 'Other user completed video',
+        'status' => 'completed',
+    ]);
+
+    Sanctum::actingAs($user);
+
+    $this->getJson('/api/heygen/videos?status=completed&per_page=1')
+        ->assertOk()
+        ->assertJsonPath('per_page', 1)
+        ->assertJsonPath('total', 1)
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.status', 'completed')
+        ->assertJsonPath('meta.stats.total', 3)
+        ->assertJsonPath('meta.stats.active', 1)
+        ->assertJsonPath('meta.stats.completed', 1)
+        ->assertJsonPath('meta.stats.failed', 1);
+});
+
 test('quota blocks requests when daily limit is reached', function () {
     Queue::fake();
     config()->set('services.heygen.daily_request_limit', 1);

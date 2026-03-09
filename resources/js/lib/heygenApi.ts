@@ -1,5 +1,5 @@
 import { apiClient, toApiError } from './apiClient';
-import type { CatalogDto, DigitalTwinDto, LiveSessionDto, Paginated, PublicAvatarDetailDto, PublicAvatarListDto, VideoAgentJobDto, VideoJobDto } from '../types/heygen';
+import type { CatalogDto, DigitalTwinDto, LiveSessionDto, Paginated, PublicAvatarDetailDto, PublicAvatarListDto, VideoAgentJobDto, VideoJobDto, VideoJobListDto } from '../types/heygen';
 
 type CreateVideoInput = {
     avatar_id: string;
@@ -106,9 +106,13 @@ export const heygenApi = {
         }
     },
 
-    async listVideos(page = 1): Promise<Paginated<VideoJobDto>> {
+    async listVideos(params: {
+        page?: number;
+        per_page?: number;
+        status?: VideoJobDto['status'];
+    } = {}): Promise<VideoJobListDto> {
         try {
-            const response = await apiClient.get<Paginated<VideoJobDto>>('/api/heygen/videos', { params: { page } });
+            const response = await apiClient.get<VideoJobListDto>('/api/heygen/videos', { params });
             return response.data;
         } catch (error) {
             throw toApiError(error);

@@ -21,6 +21,19 @@ export type VideoJobDto = {
     updated_at: string | null;
 };
 
+export type VideoJobStatsDto = {
+    total: number;
+    active: number;
+    completed: number;
+    failed: number;
+};
+
+export type VideoJobListDto = Paginated<VideoJobDto> & {
+    meta: {
+        stats: VideoJobStatsDto;
+    };
+};
+
 export type VideoAgentJobDto = {
     id: number;
     prompt: string;

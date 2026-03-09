@@ -13,6 +13,7 @@ use App\Services\HeyGen\HeyGenQuotaService;
 use App\Services\HeyGen\HeyGenScriptSafetyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 class VideoController extends Controller
@@ -28,10 +29,35 @@ class VideoController extends Controller
         $user = $request->user();
         abort_if($user === null, Response::HTTP_UNAUTHORIZED);
 
-        $jobs = HeyGenVideoJob::query()
-            ->where('user_id', $user->id)
-            ->latest()
-            ->paginate(20);
+        $validated = $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'status' => ['nullable', 'string', Rule::in(array_map(
+                static fn (VideoJobStatus $status): string => $status->value,
+                VideoJobStatus::cases(),
+            ))],
+        ]);
+
+        $baseQuery = HeyGenVideoJob::query()
+            ->where('user_id', $user->id);
+
+        $stats = [
+            'total' => (clone $baseQuery)->count(),
+            'active' => (clone $baseQuery)->whereIn('status', [
+                VideoJobStatus::Queued->value,
+                VideoJobStatus::Submitting->value,
+                VideoJobStatus::Processing->value,
+            ])->count(),
+            'completed' => (clone $baseQuery)->where('status', VideoJobStatus::Completed->value)->count(),
+            'failed' => (clone $baseQuery)->where('status', VideoJobStatus::Failed->value)->count(),
+        ];
+
+        $jobsQuery = (clone $baseQuery)->latest();
+
+        if (isset($validated['status'])) {
+            $jobsQuery->where('status', $validated['status']);
+        }
+
+        $jobs = $jobsQuery->paginate((int) ($validated['per_page'] ?? 12));
 
         return response()->json([
             'data' => $jobs->getCollection()
@@ -41,6 +67,9 @@ class VideoController extends Controller
             'last_page' => $jobs->lastPage(),
             'per_page' => $jobs->perPage(),
             'total' => $jobs->total(),
+            'meta' => [
+                'stats' => $stats,
+            ],
         ]);
     }
 
