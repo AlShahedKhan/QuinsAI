@@ -84,9 +84,13 @@ export const heygenApi = {
         }
     },
 
-    async listDigitalTwins(page = 1): Promise<Paginated<DigitalTwinDto>> {
+    async listDigitalTwins(params: {
+        page?: number;
+        per_page?: number;
+        status?: DigitalTwinDto['status'];
+    } = {}): Promise<Paginated<DigitalTwinDto>> {
         try {
-            const response = await apiClient.get<Paginated<DigitalTwinDto>>('/api/heygen/digital-twins', { params: { page } });
+            const response = await apiClient.get<Paginated<DigitalTwinDto>>('/api/heygen/digital-twins', { params });
             return response.data;
         } catch (error) {
             throw toApiError(error);

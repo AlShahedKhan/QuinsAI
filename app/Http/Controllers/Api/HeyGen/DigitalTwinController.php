@@ -13,6 +13,7 @@ use App\Services\HeyGen\HeyGenQuotaException;
 use App\Services\HeyGen\HeyGenQuotaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 class DigitalTwinController extends Controller
@@ -28,10 +29,23 @@ class DigitalTwinController extends Controller
         $user = $request->user();
         abort_if($user === null, Response::HTTP_UNAUTHORIZED);
 
-        $digitalTwins = HeyGenDigitalTwin::query()
+        $validated = $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'status' => ['nullable', 'string', Rule::in(array_map(
+                static fn (DigitalTwinStatus $status): string => $status->value,
+                DigitalTwinStatus::cases(),
+            ))],
+        ]);
+
+        $digitalTwinsQuery = HeyGenDigitalTwin::query()
             ->where('user_id', $user->id)
-            ->latest()
-            ->paginate(20);
+            ->latest();
+
+        if (isset($validated['status'])) {
+            $digitalTwinsQuery->where('status', $validated['status']);
+        }
+
+        $digitalTwins = $digitalTwinsQuery->paginate((int) ($validated['per_page'] ?? 20));
 
         return response()->json([
             'data' => $digitalTwins->getCollection()
@@ -101,4 +115,3 @@ class DigitalTwinController extends Controller
         ], Response::HTTP_ACCEPTED);
     }
 }
-

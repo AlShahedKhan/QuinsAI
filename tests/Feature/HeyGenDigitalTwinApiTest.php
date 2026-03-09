@@ -77,6 +77,56 @@ test('digital twin detail is scoped to owner', function () {
         ->assertNotFound();
 });
 
+test('digital twin index supports status filters and custom page size', function () {
+    $user = User::factory()->create(['email_verified_at' => now()]);
+    $other = User::factory()->create(['email_verified_at' => now()]);
+
+    HeyGenDigitalTwin::query()->create([
+        'user_id' => $user->id,
+        'avatar_name' => 'Completed Twin A',
+        'training_video_path' => 'private/a-training.mp4',
+        'consent_video_path' => 'private/a-consent.mp4',
+        'status' => 'completed',
+        'provider_avatar_id' => 'avatar-a',
+    ]);
+
+    HeyGenDigitalTwin::query()->create([
+        'user_id' => $user->id,
+        'avatar_name' => 'Processing Twin',
+        'training_video_path' => 'private/b-training.mp4',
+        'consent_video_path' => 'private/b-consent.mp4',
+        'status' => 'processing',
+    ]);
+
+    HeyGenDigitalTwin::query()->create([
+        'user_id' => $user->id,
+        'avatar_name' => 'Completed Twin B',
+        'training_video_path' => 'private/c-training.mp4',
+        'consent_video_path' => 'private/c-consent.mp4',
+        'status' => 'completed',
+        'provider_avatar_id' => 'avatar-c',
+    ]);
+
+    HeyGenDigitalTwin::query()->create([
+        'user_id' => $other->id,
+        'avatar_name' => 'Other User Twin',
+        'training_video_path' => 'private/d-training.mp4',
+        'consent_video_path' => 'private/d-consent.mp4',
+        'status' => 'completed',
+        'provider_avatar_id' => 'avatar-d',
+    ]);
+
+    Sanctum::actingAs($user);
+
+    $response = $this->getJson('/api/heygen/digital-twins?status=completed&per_page=1');
+
+    $response->assertOk()
+        ->assertJsonPath('per_page', 1)
+        ->assertJsonPath('total', 2)
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.status', 'completed');
+});
+
 test('digital twin quota blocks requests when daily limit is reached', function () {
     Queue::fake();
     Storage::fake('local');
@@ -126,4 +176,3 @@ test('digital twin signed media route allows signed requests only', function () 
     $this->get($signedUrl)->assertOk();
     $this->get("/api/heygen/digital-twins/media/{$digitalTwin->id}/training")->assertForbidden();
 });
-

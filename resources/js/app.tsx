@@ -12,6 +12,7 @@ import { VideoAgentPage } from './pages/VideoAgentPage';
 import { VideoHistoryPage } from './pages/VideoHistoryPage';
 import { LiveAvatarPage } from './pages/LiveAvatarPage';
 import { AvatarsPage } from './pages/AvatarsPage';
+import { AvatarCreatePage } from './pages/AvatarCreatePage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { AdminLoginPage } from './pages/auth/AdminLoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
@@ -27,6 +28,7 @@ const userNavGroups = [
         label: 'Workspace',
         items: [
             { to: '/avatars', label: 'Avatars' },
+            { to: '/avatars/create', label: 'Create Avatar' },
             { to: '/videos/generate', label: 'Generate' },
             { to: '/videos', label: 'History' },
             { to: '/live', label: 'Live Avatar' },
@@ -221,6 +223,16 @@ function AppRouter() {
                     <ProtectedRoute>
                         <UserLayout>
                             <AvatarsPage />
+                        </UserLayout>
+                    </ProtectedRoute>
+                )}
+            />
+            <Route
+                path="/avatars/create"
+                element={(
+                    <ProtectedRoute>
+                        <UserLayout>
+                            <AvatarCreatePage />
                         </UserLayout>
                     </ProtectedRoute>
                 )}
