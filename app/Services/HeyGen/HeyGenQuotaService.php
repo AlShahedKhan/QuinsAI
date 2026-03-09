@@ -59,6 +59,40 @@ class HeyGenQuotaService
         });
     }
 
+    /**
+     * @return array{daily_live_minute_limit: int, live_minutes_used: int, live_minutes_remaining: int}
+     */
+    public function liveMinuteQuota(User $user): array
+    {
+        $record = HeyGenUsageDaily::query()
+            ->where('user_id', $user->id)
+            ->whereDate('usage_date', now()->toDateString())
+            ->first();
+
+        $limit = $record?->daily_minute_limit ?? (int) config('services.heygen.daily_live_minute_limit', 30);
+        $used = $record?->live_session_minutes ?? 0;
+
+        return [
+            'daily_live_minute_limit' => $limit,
+            'live_minutes_used' => $used,
+            'live_minutes_remaining' => max(0, $limit - $used),
+        ];
+    }
+
+    /**
+     * @return array{daily_live_minute_limit: int, live_minutes_used: int, live_minutes_remaining: int}
+     */
+    public function ensureLiveMinutesAvailable(User $user): array
+    {
+        $quota = $this->liveMinuteQuota($user);
+
+        if ($quota['live_minutes_remaining'] <= 0) {
+            throw new HeyGenQuotaException('Daily HeyGen live session minute quota reached.');
+        }
+
+        return $quota;
+    }
+
     public function remainingVideoRequests(User $user): int
     {
         $record = HeyGenUsageDaily::query()

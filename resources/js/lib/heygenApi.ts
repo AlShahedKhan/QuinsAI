@@ -1,5 +1,5 @@
 import { apiClient, toApiError } from './apiClient';
-import type { CatalogDto, DigitalTwinDto, LiveSessionDto, Paginated, PublicAvatarDetailDto, PublicAvatarListDto, VideoAgentJobDto, VideoJobDto, VideoJobListDto } from '../types/heygen';
+import type { CatalogDto, DigitalTwinDto, LiveQuotaDto, LiveSessionDto, Paginated, PublicAvatarDetailDto, PublicAvatarListDto, VideoAgentJobDto, VideoJobDto, VideoJobListDto } from '../types/heygen';
 
 type CreateVideoInput = {
     avatar_id: string;
@@ -146,19 +146,37 @@ export const heygenApi = {
         }
     },
 
-    async createLiveSession(input: CreateLiveSessionInput): Promise<LiveSessionDto> {
+    async getLiveQuota(): Promise<LiveQuotaDto> {
         try {
-            const response = await apiClient.post<{ data: LiveSessionDto }>('/api/heygen/live/sessions', input);
+            const response = await apiClient.get<{ data: LiveQuotaDto }>('/api/heygen/live/quota');
             return response.data.data;
         } catch (error) {
             throw toApiError(error);
         }
     },
 
-    async endLiveSession(id: number): Promise<LiveSessionDto> {
+    async createLiveSession(input: CreateLiveSessionInput): Promise<{ data: LiveSessionDto; quota: LiveQuotaDto }> {
         try {
-            const response = await apiClient.post<{ data: LiveSessionDto }>(`/api/heygen/live/sessions/${id}/end`);
+            const response = await apiClient.post<{ data: LiveSessionDto; quota: LiveQuotaDto }>('/api/heygen/live/sessions', input);
+            return response.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
+    async activateLiveSession(id: number): Promise<LiveSessionDto> {
+        try {
+            const response = await apiClient.post<{ data: LiveSessionDto }>(`/api/heygen/live/sessions/${id}/activate`);
             return response.data.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
+    async endLiveSession(id: number): Promise<{ data: LiveSessionDto; quota: LiveQuotaDto }> {
+        try {
+            const response = await apiClient.post<{ data: LiveSessionDto; quota: LiveQuotaDto }>(`/api/heygen/live/sessions/${id}/end`);
+            return response.data;
         } catch (error) {
             throw toApiError(error);
         }

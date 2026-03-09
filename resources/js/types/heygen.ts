@@ -66,6 +66,12 @@ export type LiveSessionDto = {
     updated_at: string | null;
 };
 
+export type LiveQuotaDto = {
+    daily_live_minute_limit: number;
+    live_minutes_used: number;
+    live_minutes_remaining: number;
+};
+
 export type DigitalTwinDto = {
     id: number;
     avatar_name: string;

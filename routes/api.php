@@ -56,7 +56,9 @@ Route::middleware(['auth:sanctum', 'throttle:heygen-read'])->prefix('heygen')->g
     Route::get('/digital-twins/{digitalTwin}', [DigitalTwinController::class, 'show']);
     Route::post('/digital-twins', [DigitalTwinController::class, 'store'])->middleware('throttle:heygen-write');
 
+    Route::get('/live/quota', [LiveSessionController::class, 'quota']);
     Route::post('/live/sessions', [LiveSessionController::class, 'store'])->middleware('throttle:heygen-write');
+    Route::post('/live/sessions/{liveSession}/activate', [LiveSessionController::class, 'activate'])->middleware('throttle:heygen-write');
     Route::post('/live/sessions/{liveSession}/end', [LiveSessionController::class, 'end'])->middleware('throttle:heygen-write');
 });
 

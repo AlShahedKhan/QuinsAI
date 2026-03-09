@@ -39,7 +39,6 @@ class HeyGenLiveSessionWorkflowService
             ) ?: null,
             'status' => LiveSessionStatus::Created,
             'token_expires_at' => now()->addMinutes(10),
-            'started_at' => now(),
             'metadata' => [
                 'token' => $tokenData['token'] ?? $tokenData['access_token'] ?? null,
                 'token_response' => $tokenResponse,
@@ -49,14 +48,31 @@ class HeyGenLiveSessionWorkflowService
         ]);
     }
 
+    public function markSessionActive(HeyGenLiveSession $liveSession): HeyGenLiveSession
+    {
+        if ($liveSession->status === LiveSessionStatus::Ended) {
+            return $liveSession;
+        }
+
+        $liveSession->status = LiveSessionStatus::Active;
+        $liveSession->started_at ??= now();
+        $liveSession->save();
+
+        return $liveSession;
+    }
+
     public function endSession(HeyGenLiveSession $liveSession): HeyGenLiveSession
     {
+        if ($liveSession->status === LiveSessionStatus::Ended) {
+            return $liveSession;
+        }
+
         if ($liveSession->provider_session_id !== null && $liveSession->provider_session_id !== '') {
             $this->client->endLiveSession($liveSession->provider_session_id);
         }
 
         $liveSession->status = LiveSessionStatus::Ended;
-        $liveSession->ended_at = now();
+        $liveSession->ended_at ??= now();
         $liveSession->save();
 
         return $liveSession;
