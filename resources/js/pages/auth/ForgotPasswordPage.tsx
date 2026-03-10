@@ -2,6 +2,7 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { AuthShell } from '../../components/ui/AuthShell';
+import { AuthTextField } from '../../components/ui/AuthTextField';
 import { FormNotice } from '../../components/ui/FormNotice';
 
 export function ForgotPasswordPage() {
@@ -41,18 +42,16 @@ export function ForgotPasswordPage() {
             )}
         >
             <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                    <label className="field-label" htmlFor="forgot-email">Email</label>
-                    <input
-                        id="forgot-email"
-                        type="email"
-                        className="text-field"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                        autoComplete="email"
-                        required
-                    />
-                </div>
+                <AuthTextField
+                    id="forgot-email"
+                    label="Email"
+                    type="email"
+                    value={email}
+                    placeholder="Enter your account email"
+                    autoComplete="email"
+                    icon="mail"
+                    onChange={setEmail}
+                />
 
                 <button type="submit" disabled={loading} className="btn-primary w-full">
                     {loading ? 'Sending link...' : 'Send Reset Link'}

@@ -1,9 +1,22 @@
-﻿import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getUserLandingPath, useAuth } from '../../auth/AuthContext';
-import { AuthPanel } from '../../components/ui/AuthPanel';
+import { AuthShell } from '../../components/ui/AuthShell';
 import { AuthTextField } from '../../components/ui/AuthTextField';
 import { FormNotice } from '../../components/ui/FormNotice';
+
+function AuthTabs() {
+    return (
+        <nav className="auth-tabs" aria-label="Authentication tabs">
+            <Link to="/login" className="auth-tab auth-tab-active">
+                Login
+            </Link>
+            <Link to="/register" className="auth-tab">
+                Sign Up
+            </Link>
+        </nav>
+    );
+}
 
 export function LoginPage() {
     const navigate = useNavigate();
@@ -14,8 +27,17 @@ export function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const canSubmit = useMemo(
+        () => !loading && email.trim() !== '' && password !== '',
+        [email, loading, password],
+    );
+
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        if (!canSubmit) {
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
@@ -31,8 +53,18 @@ export function LoginPage() {
     }
 
     return (
-        <AuthPanel mode="login">
-            <form onSubmit={handleSubmit} className="chat-auth-form">
+        <AuthShell
+            title="Welcome to QuinsAI"
+            subtitle="Connect with your team and launch avatar workflows in real-time."
+            eyebrow="User Access"
+            tabs={<AuthTabs />}
+            footer={(
+                <p>
+                    Need admin access? Go directly to <Link to="/admin/login" className="font-semibold text-sky-700 hover:text-sky-800">/admin/login</Link>
+                </p>
+            )}
+        >
+            <form onSubmit={handleSubmit} className="space-y-5">
                 <AuthTextField
                     id="login-email"
                     label="Email"
@@ -55,19 +87,18 @@ export function LoginPage() {
                     onChange={setPassword}
                 />
 
-                <div className="chat-auth-link-row">
-                    <div className="flex items-center gap-4">
-                        <Link to="/forgot-password" className="chat-auth-link">Forgot password?</Link>
-                        <Link to="/admin/login" className="chat-auth-link">Admin login</Link>
-                    </div>
+                <div className="flex justify-end">
+                    <Link to="/forgot-password" className="font-semibold text-sky-700 hover:text-sky-800">
+                        Forgot password?
+                    </Link>
                 </div>
 
-                <button type="submit" disabled={loading} className="chat-auth-submit">
+                <button type="submit" disabled={!canSubmit} className="btn-primary w-full">
                     {loading ? 'Signing in...' : 'Sign In'}
                 </button>
 
-                {error && <FormNotice tone="error">{error}</FormNotice>}
+                {error ? <FormNotice tone="error">{error}</FormNotice> : null}
             </form>
-        </AuthPanel>
+        </AuthShell>
     );
 }

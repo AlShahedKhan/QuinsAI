@@ -1,7 +1,7 @@
-﻿import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getAdminLandingPath, useAuth } from '../../auth/AuthContext';
-import { AuthPanel } from '../../components/ui/AuthPanel';
+import { AuthShell } from '../../components/ui/AuthShell';
 import { AuthTextField } from '../../components/ui/AuthTextField';
 import { FormNotice } from '../../components/ui/FormNotice';
 
@@ -14,8 +14,17 @@ export function AdminLoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const canSubmit = useMemo(
+        () => !loading && email.trim() !== '' && password !== '',
+        [email, loading, password],
+    );
+
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        if (!canSubmit) {
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
@@ -31,9 +40,18 @@ export function AdminLoginPage() {
     }
 
     return (
-        <AuthPanel mode="login">
-            <form onSubmit={handleSubmit} className="chat-auth-form">
-                <FormNotice tone="info">Admin access only. Use seeded administrator credentials.</FormNotice>
+        <AuthShell
+            title="Admin Console Access"
+            subtitle="Restricted sign-in for administrators and privileged operators only."
+            eyebrow="Admin Login"
+            footer={(
+                <p>
+                    Need the user workspace instead? <Link to="/login" className="font-semibold text-sky-700 hover:text-sky-800">Back to user login</Link>
+                </p>
+            )}
+        >
+            <form onSubmit={handleSubmit} className="space-y-5">
+                <FormNotice tone="info">Admin access only. Use seeded administrator credentials or a role with admin access.</FormNotice>
 
                 <AuthTextField
                     id="admin-login-email"
@@ -57,16 +75,12 @@ export function AdminLoginPage() {
                     onChange={setPassword}
                 />
 
-                <button type="submit" disabled={loading} className="chat-auth-submit">
+                <button type="submit" disabled={!canSubmit} className="btn-primary w-full">
                     {loading ? 'Signing in...' : 'Admin Sign In'}
                 </button>
 
-                {error && <FormNotice tone="error">{error}</FormNotice>}
-
-                <div className="chat-auth-link-row">
-                    <Link to="/login" className="chat-auth-link">Back to user login</Link>
-                </div>
+                {error ? <FormNotice tone="error">{error}</FormNotice> : null}
             </form>
-        </AuthPanel>
+        </AuthShell>
     );
 }

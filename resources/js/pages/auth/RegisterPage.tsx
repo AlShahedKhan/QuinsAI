@@ -1,9 +1,22 @@
-﻿import { FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { FormEvent, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
-import { AuthPanel } from '../../components/ui/AuthPanel';
+import { AuthShell } from '../../components/ui/AuthShell';
 import { AuthTextField } from '../../components/ui/AuthTextField';
 import { FormNotice } from '../../components/ui/FormNotice';
+
+function AuthTabs() {
+    return (
+        <nav className="auth-tabs" aria-label="Authentication tabs">
+            <Link to="/login" className="auth-tab">
+                Login
+            </Link>
+            <Link to="/register" className="auth-tab auth-tab-active">
+                Sign Up
+            </Link>
+        </nav>
+    );
+}
 
 export function RegisterPage() {
     const navigate = useNavigate();
@@ -17,8 +30,21 @@ export function RegisterPage() {
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
 
+    const canSubmit = useMemo(
+        () => !loading
+            && name.trim() !== ''
+            && email.trim() !== ''
+            && password !== ''
+            && passwordConfirmation !== '',
+        [email, loading, name, password, passwordConfirmation],
+    );
+
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        if (!canSubmit) {
+            return;
+        }
+
         setLoading(true);
         setError(null);
         setMessage(null);
@@ -42,8 +68,13 @@ export function RegisterPage() {
     }
 
     return (
-        <AuthPanel mode="register">
-            <form onSubmit={handleSubmit} className="chat-auth-form">
+        <AuthShell
+            title="Welcome to QuinsAI"
+            subtitle="Connect with your team and launch avatar workflows in real-time."
+            eyebrow="Open Registration"
+            tabs={<AuthTabs />}
+        >
+            <form onSubmit={handleSubmit} className="space-y-5">
                 <AuthTextField
                     id="register-name"
                     label="Full Name"
@@ -66,35 +97,37 @@ export function RegisterPage() {
                     onChange={setEmail}
                 />
 
-                <AuthTextField
-                    id="register-password"
-                    label="Password"
-                    type="password"
-                    value={password}
-                    placeholder="Create a password"
-                    autoComplete="new-password"
-                    icon="lock"
-                    onChange={setPassword}
-                />
+                <div className="grid gap-5 sm:grid-cols-2">
+                    <AuthTextField
+                        id="register-password"
+                        label="Password"
+                        type="password"
+                        value={password}
+                        placeholder="Create a password"
+                        autoComplete="new-password"
+                        icon="lock"
+                        onChange={setPassword}
+                    />
 
-                <AuthTextField
-                    id="register-password-confirmation"
-                    label="Confirm Password"
-                    type="password"
-                    value={passwordConfirmation}
-                    placeholder="Confirm your password"
-                    autoComplete="new-password"
-                    icon="lock"
-                    onChange={setPasswordConfirmation}
-                />
+                    <AuthTextField
+                        id="register-password-confirmation"
+                        label="Confirm Password"
+                        type="password"
+                        value={passwordConfirmation}
+                        placeholder="Confirm your password"
+                        autoComplete="new-password"
+                        icon="lock"
+                        onChange={setPasswordConfirmation}
+                    />
+                </div>
 
-                <button type="submit" disabled={loading} className="chat-auth-submit">
+                <button type="submit" disabled={!canSubmit} className="btn-primary w-full">
                     {loading ? 'Creating account...' : 'Create Account'}
                 </button>
 
-                {message && <FormNotice tone="success">{message}</FormNotice>}
-                {error && <FormNotice tone="error">{error}</FormNotice>}
+                {message ? <FormNotice tone="success">{message}</FormNotice> : null}
+                {error ? <FormNotice tone="error">{error}</FormNotice> : null}
             </form>
-        </AuthPanel>
+        </AuthShell>
     );
 }

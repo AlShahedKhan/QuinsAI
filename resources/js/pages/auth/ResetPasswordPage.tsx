@@ -2,6 +2,7 @@
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { AuthShell } from '../../components/ui/AuthShell';
+import { AuthTextField } from '../../components/ui/AuthTextField';
 import { FormNotice } from '../../components/ui/FormNotice';
 
 export function ResetPasswordPage() {
@@ -59,45 +60,39 @@ export function ResetPasswordPage() {
             )}
         >
             <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                    <label className="field-label" htmlFor="reset-email">Email</label>
-                    <input
-                        id="reset-email"
-                        type="email"
-                        className="text-field"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                        autoComplete="email"
-                        required
-                    />
-                </div>
+                <AuthTextField
+                    id="reset-email"
+                    label="Email"
+                    type="email"
+                    value={email}
+                    placeholder="Enter your account email"
+                    autoComplete="email"
+                    icon="mail"
+                    onChange={setEmail}
+                />
 
                 <div className="grid gap-5 sm:grid-cols-2">
-                    <div>
-                        <label className="field-label" htmlFor="reset-password">New Password</label>
-                        <input
-                            id="reset-password"
-                            type="password"
-                            className="text-field"
-                            value={password}
-                            onChange={(event) => setPassword(event.target.value)}
-                            autoComplete="new-password"
-                            required
-                        />
-                    </div>
+                    <AuthTextField
+                        id="reset-password"
+                        label="New Password"
+                        type="password"
+                        value={password}
+                        placeholder="Create a new password"
+                        autoComplete="new-password"
+                        icon="lock"
+                        onChange={setPassword}
+                    />
 
-                    <div>
-                        <label className="field-label" htmlFor="reset-password-confirmation">Confirm Password</label>
-                        <input
-                            id="reset-password-confirmation"
-                            type="password"
-                            className="text-field"
-                            value={passwordConfirmation}
-                            onChange={(event) => setPasswordConfirmation(event.target.value)}
-                            autoComplete="new-password"
-                            required
-                        />
-                    </div>
+                    <AuthTextField
+                        id="reset-password-confirmation"
+                        label="Confirm Password"
+                        type="password"
+                        value={passwordConfirmation}
+                        placeholder="Confirm your password"
+                        autoComplete="new-password"
+                        icon="lock"
+                        onChange={setPasswordConfirmation}
+                    />
                 </div>
 
                 <button type="submit" disabled={loading} className="btn-primary w-full">
