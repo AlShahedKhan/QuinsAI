@@ -58,11 +58,6 @@ export function LoginPage() {
             subtitle="Connect with your team and launch avatar workflows in real-time."
             eyebrow="User Access"
             tabs={<AuthTabs />}
-            footer={(
-                <p>
-                    Need admin access? Go directly to <Link to="/admin/login" className="font-semibold text-sky-700 hover:text-sky-800">/admin/login</Link>
-                </p>
-            )}
         >
             <form onSubmit={handleSubmit} className="space-y-5">
                 <AuthTextField
