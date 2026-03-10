@@ -324,6 +324,14 @@
         box-shadow: 0 18px 34px -22px rgba(13, 110, 207, 0.88);
     }
 
+    .auth-brand-text {
+        color: white;
+        font-size: 1.25rem;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: 0.08em;
+    }
+
     .auth-heading {
         margin-top: 0.85rem;
         color: #0b1220;
