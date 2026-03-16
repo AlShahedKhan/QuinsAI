@@ -40,6 +40,7 @@ class AuthController extends Controller
             ],
         ], Response::HTTP_CREATED);
     }
+    //
     public function login(LoginRequest $request): JsonResponse
     {
         $payload = $request->validated();
