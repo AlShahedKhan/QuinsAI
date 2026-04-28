@@ -8,6 +8,7 @@ use App\Models\HeyGenVideoJob;
 use App\Services\HeyGen\HeyGenClient;
 use App\Services\HeyGen\HeyGenException;
 use Illuminate\Support\Arr;
+use Throwable;
 
 class HeyGenVideoWorkflowService
 {
@@ -109,6 +110,21 @@ class HeyGenVideoWorkflowService
 
         $videoJob->status = VideoJobStatus::Processing;
         $videoJob->provider_payload = $providerPayload;
+        $videoJob->save();
+    }
+
+    public function markProviderVideoNotFound(HeyGenVideoJob $videoJob, Throwable $throwable): void
+    {
+        $videoJob->status = VideoJobStatus::Failed;
+        $videoJob->failed_at = now();
+        $videoJob->error_code = 'provider_video_not_found';
+        $videoJob->error_message = 'HeyGen cannot find this video for the configured API key/account. Check HEYGEN_API_KEY, then generate a new video after adding API credits.';
+        $videoJob->provider_payload = [
+            'status_lookup_error' => [
+                'message' => $throwable->getMessage(),
+                'code' => $throwable->getCode(),
+            ],
+        ];
         $videoJob->save();
     }
 }

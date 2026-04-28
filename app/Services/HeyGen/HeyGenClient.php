@@ -3,6 +3,7 @@
 namespace App\Services\HeyGen;
 
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 
 class HeyGenClient
@@ -31,6 +32,14 @@ class HeyGenClient
     public function getVideoStatus(string $providerVideoId): array
     {
         return $this->request('get', '/v1/video_status.get', ['video_id' => $providerVideoId]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getRemainingQuota(): array
+    {
+        return $this->request('get', '/v2/user/remaining_quota');
     }
 
     /**
@@ -150,12 +159,23 @@ class HeyGenClient
             retryTimes: $retryTimes,
         );
 
-        $response = match (strtolower($method)) {
-            'get' => $request->get($uri, $payload),
-            'post' => $request->post($uri, $payload),
-            'delete' => $request->delete($uri, $payload),
-            default => throw new HeyGenException("Unsupported HeyGen method [$method].", 500),
-        };
+        try {
+            $response = match (strtolower($method)) {
+                'get' => $request->get($uri, $payload),
+                'post' => $request->post($uri, $payload),
+                'delete' => $request->delete($uri, $payload),
+                default => throw new HeyGenException("Unsupported HeyGen method [$method].", 500),
+            };
+        } catch (RequestException $exception) {
+            $response = $exception->response;
+            $json = $response->json();
+
+            throw new HeyGenException(
+                message: (string) ($json['message'] ?? $exception->getMessage()),
+                statusCode: $response->status(),
+                context: is_array($json) ? $json : null,
+            );
+        }
 
         $json = $response->json();
 

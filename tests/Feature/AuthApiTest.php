@@ -2,11 +2,13 @@
 
 use App\Models\AuthRefreshToken;
 use App\Models\User;
+use App\Services\HeyGen\HeyGenClient;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\PersonalAccessToken;
+use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
 
@@ -154,6 +156,16 @@ test('logout revokes current access token and refresh token', function () {
 
 test('unverified user can login and access heygen api', function () {
     Queue::fake();
+
+    $this->mock(HeyGenClient::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('getRemainingQuota')
+            ->andReturn([
+                'data' => [
+                    'remaining_quota' => 10,
+                    'details' => [],
+                ],
+            ]);
+    });
 
     $user = User::factory()->create([
         'password' => 'StrongPass#123',

@@ -11,6 +11,8 @@ import { VideoGeneratorPage } from './pages/VideoGeneratorPage';
 import { VideoAgentPage } from './pages/VideoAgentPage';
 import { VideoHistoryPage } from './pages/VideoHistoryPage';
 import { LiveAvatarPage } from './pages/LiveAvatarPage';
+import { CreditsPage } from './pages/CreditsPage';
+import { FreeVideoAgentPage } from './pages/FreeVideoAgentPage';
 import { AvatarsPage } from './pages/AvatarsPage';
 import { AvatarCreatePage } from './pages/AvatarCreatePage';
 import { LoginPage } from './pages/auth/LoginPage';
@@ -30,7 +32,9 @@ const userNavGroups = [
             { to: '/avatars', label: 'Avatars' },
             { to: '/avatars/create', label: 'Create Avatar' },
             { to: '/videos/generate', label: 'Generate' },
+            { to: '/videos/agent', label: 'Free Agent' },
             { to: '/videos', label: 'History' },
+            { to: '/credits', label: 'Credits' },
             { to: '/live', label: 'Live Avatar' },
         ],
     },
@@ -261,6 +265,26 @@ function AppRouter() {
                     <ProtectedRoute>
                         <UserLayout>
                             <VideoHistoryPage />
+                        </UserLayout>
+                    </ProtectedRoute>
+                )}
+            />
+            <Route
+                path="/videos/agent"
+                element={(
+                    <ProtectedRoute>
+                        <UserLayout>
+                            <FreeVideoAgentPage />
+                        </UserLayout>
+                    </ProtectedRoute>
+                )}
+            />
+            <Route
+                path="/credits"
+                element={(
+                    <ProtectedRoute>
+                        <UserLayout>
+                            <CreditsPage />
                         </UserLayout>
                     </ProtectedRoute>
                 )}

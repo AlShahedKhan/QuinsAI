@@ -8,6 +8,7 @@ use App\Jobs\SubmitHeyGenVideoAgentJob;
 use App\Models\HeyGenVideoAgentJob;
 use App\Models\HeyGenWebhookEvent;
 use App\Models\User;
+use App\Services\HeyGen\HeyGenClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
@@ -22,6 +23,38 @@ function actingAsVideoAgentAdmin(): User
     Sanctum::actingAs($admin);
 
     return $admin;
+}
+
+function mockAvailableVideoAgentCredits(): void
+{
+    $mock = \Mockery::mock(HeyGenClient::class);
+    $mock->shouldReceive('getRemainingQuota')
+        ->andReturn([
+            'data' => [
+                'remaining_quota' => 0,
+                'details' => [
+                    'video_agent_v2_free_video' => 1,
+                ],
+            ],
+        ]);
+
+    app()->instance(HeyGenClient::class, $mock);
+}
+
+function mockAvailableMainVideoCredits(): void
+{
+    $mock = \Mockery::mock(HeyGenClient::class);
+    $mock->shouldReceive('getRemainingQuota')
+        ->andReturn([
+            'data' => [
+                'remaining_quota' => 10,
+                'details' => [
+                    'video_agent_v2_free_video' => 0,
+                ],
+            ],
+        ]);
+
+    app()->instance(HeyGenClient::class, $mock);
 }
 
 test('video agent creation endpoint requires auth', function () {
@@ -43,6 +76,7 @@ test('non admin user cannot access video agent endpoints', function () {
 
 test('admin can queue a heygen video agent job', function () {
     Queue::fake();
+    mockAvailableMainVideoCredits();
     $admin = actingAsVideoAgentAdmin();
 
     $response = $this->postJson('/api/admin/heygen/video-agent/videos', [
@@ -58,6 +92,47 @@ test('admin can queue a heygen video agent job', function () {
     expect($job?->prompt)->toContain('QuinsAI');
 
     Queue::assertPushed(SubmitHeyGenVideoAgentJob::class, 1);
+});
+
+test('authenticated user can queue a heygen video agent job with api credits', function () {
+    Queue::fake();
+    mockAvailableMainVideoCredits();
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+    Sanctum::actingAs($user);
+
+    $response = $this->postJson('/api/heygen/video-agent/videos', [
+        'prompt' => 'Create a short welcome video for QuinsAI using Video Agent.',
+    ]);
+
+    $response->assertAccepted()
+        ->assertJsonPath('data.status', 'queued');
+
+    $job = HeyGenVideoAgentJob::query()->first();
+    expect($job)->not->toBeNull();
+    expect($job?->user_id)->toBe($user->id);
+
+    Queue::assertPushed(SubmitHeyGenVideoAgentJob::class, 1);
+});
+
+test('video agent free bucket without api credits is rejected before queueing', function () {
+    Queue::fake();
+    mockAvailableVideoAgentCredits();
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+    Sanctum::actingAs($user);
+
+    $this->postJson('/api/heygen/video-agent/videos', [
+        'prompt' => 'Create a short welcome video for QuinsAI using Video Agent.',
+    ])
+        ->assertPaymentRequired()
+        ->assertJsonPath('error.code', 'heygen_video_agent_quota_empty');
+
+    Queue::assertNothingPushed();
 });
 
 test('video agent detail is scoped to owner', function () {
@@ -78,6 +153,7 @@ test('video agent detail is scoped to owner', function () {
 
 test('video agent requests share the daily heygen video quota', function () {
     Queue::fake();
+    mockAvailableMainVideoCredits();
     config()->set('services.heygen.daily_request_limit', 1);
 
     actingAsVideoAgentAdmin();

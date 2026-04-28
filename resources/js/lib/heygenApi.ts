@@ -1,5 +1,5 @@
 import { apiClient, toApiError } from './apiClient';
-import type { CatalogDto, DigitalTwinDto, LiveQuotaDto, LiveSessionDto, Paginated, PublicAvatarDetailDto, PublicAvatarListDto, VideoAgentJobDto, VideoJobDto, VideoJobListDto } from '../types/heygen';
+import type { CatalogDto, DigitalTwinDto, HeyGenQuotaDto, LiveQuotaDto, LiveSessionDto, Paginated, PublicAvatarDetailDto, PublicAvatarListDto, VideoAgentJobDto, VideoJobDto, VideoJobListDto } from '../types/heygen';
 
 type CreateVideoInput = {
     avatar_id: string;
@@ -15,6 +15,8 @@ type CreateLiveSessionInput = {
 
 type CreateVideoAgentInput = {
     prompt: string;
+    avatar_id?: string | null;
+    voice_id?: string | null;
 };
 
 export const heygenApi = {
@@ -25,6 +27,15 @@ export const heygenApi = {
             const response = await apiClient.get<{ data: CatalogDto }>('/api/heygen/catalog', {
                 params: include === 'all' ? undefined : { include },
             });
+            return response.data.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
+    async getQuota(): Promise<HeyGenQuotaDto> {
+        try {
+            const response = await apiClient.get<{ data: HeyGenQuotaDto }>('/api/heygen/quota');
             return response.data.data;
         } catch (error) {
             throw toApiError(error);
@@ -43,6 +54,15 @@ export const heygenApi = {
     async createVideoAgent(input: CreateVideoAgentInput): Promise<{ data: VideoAgentJobDto; quota: Record<string, number> }> {
         try {
             const response = await apiClient.post<{ data: VideoAgentJobDto; quota: Record<string, number> }>('/api/admin/heygen/video-agent/videos', input);
+            return response.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
+    async createUserVideoAgent(input: CreateVideoAgentInput): Promise<{ data: VideoAgentJobDto; quota: Record<string, number> }> {
+        try {
+            const response = await apiClient.post<{ data: VideoAgentJobDto; quota: Record<string, number> }>('/api/heygen/video-agent/videos', input);
             return response.data;
         } catch (error) {
             throw toApiError(error);
@@ -131,6 +151,15 @@ export const heygenApi = {
     async listVideoAgentVideos(page = 1): Promise<Paginated<VideoAgentJobDto>> {
         try {
             const response = await apiClient.get<Paginated<VideoAgentJobDto>>('/api/admin/heygen/video-agent/videos', { params: { page } });
+            return response.data;
+        } catch (error) {
+            throw toApiError(error);
+        }
+    },
+
+    async listUserVideoAgentVideos(page = 1): Promise<Paginated<VideoAgentJobDto>> {
+        try {
+            const response = await apiClient.get<Paginated<VideoAgentJobDto>>('/api/heygen/video-agent/videos', { params: { page } });
             return response.data;
         } catch (error) {
             throw toApiError(error);

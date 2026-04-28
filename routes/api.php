@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\HeyGen\DigitalTwinMediaController;
 use App\Http\Controllers\Api\HeyGen\LiveSessionController;
 use App\Http\Controllers\Api\HeyGen\PublicAvatarController;
 use App\Http\Controllers\Api\HeyGen\PublicAvatarDetailController;
+use App\Http\Controllers\Api\HeyGen\QuotaController;
 use App\Http\Controllers\Api\HeyGen\VideoAgentController;
 use App\Http\Controllers\Api\HeyGen\VideoController;
 use App\Http\Controllers\Api\HeyGen\WebhookController;
@@ -45,12 +46,17 @@ Route::prefix('auth')->group(function (): void {
 
 Route::middleware(['auth:sanctum', 'throttle:heygen-read'])->prefix('heygen')->group(function (): void {
     Route::get('/catalog', CatalogController::class);
+    Route::get('/quota', QuotaController::class);
     Route::get('/public-avatars', PublicAvatarController::class);
     Route::get('/public-avatars/{avatarId}/details', PublicAvatarDetailController::class);
 
     Route::get('/videos', [VideoController::class, 'index']);
     Route::get('/videos/{videoJob}', [VideoController::class, 'show']);
     Route::post('/videos', [VideoController::class, 'store'])->middleware('throttle:heygen-write');
+
+    Route::get('/video-agent/videos', [VideoAgentController::class, 'index']);
+    Route::get('/video-agent/videos/{videoAgentJob}', [VideoAgentController::class, 'show']);
+    Route::post('/video-agent/videos', [VideoAgentController::class, 'store'])->middleware('throttle:heygen-write');
 
     Route::get('/digital-twins', [DigitalTwinController::class, 'index']);
     Route::get('/digital-twins/{digitalTwin}', [DigitalTwinController::class, 'show']);

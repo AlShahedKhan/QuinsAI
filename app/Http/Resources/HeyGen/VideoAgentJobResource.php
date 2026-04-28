@@ -16,6 +16,8 @@ class VideoAgentJobResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'avatar_id' => $this->avatar_id,
+            'voice_id' => $this->voice_id,
             'prompt' => $this->prompt,
             'status' => $this->status->value,
             'provider_video_id' => $this->provider_video_id,

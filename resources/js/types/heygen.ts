@@ -31,11 +31,17 @@ export type VideoJobStatsDto = {
 export type VideoJobListDto = Paginated<VideoJobDto> & {
     meta: {
         stats: VideoJobStatsDto;
+        timing: {
+            average_completion_seconds: number | null;
+            active_oldest_submitted_at: string | null;
+        };
     };
 };
 
 export type VideoAgentJobDto = {
     id: number;
+    avatar_id: string | null;
+    voice_id: string | null;
     prompt: string;
     status: VideoJobStatus;
     provider_video_id: string | null;
@@ -70,6 +76,13 @@ export type LiveQuotaDto = {
     daily_live_minute_limit: number;
     live_minutes_used: number;
     live_minutes_remaining: number;
+};
+
+export type HeyGenQuotaDto = {
+    remaining_quota: number;
+    is_empty: boolean;
+    details: Record<string, number>;
+    checked_at: string;
 };
 
 export type DigitalTwinDto = {

@@ -18,6 +18,8 @@ class StoreVideoAgentRequest extends FormRequest
     {
         return [
             'prompt' => ['required', 'string', 'max:'.(int) config('services.heygen.video_agent_prompt_max_chars', 5000)],
+            'avatar_id' => ['nullable', 'string', 'max:255'],
+            'voice_id' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

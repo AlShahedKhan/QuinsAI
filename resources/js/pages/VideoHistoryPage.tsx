@@ -45,6 +45,37 @@ function formatDateTime(value: string | null): string {
     }).format(date);
 }
 
+function formatDuration(seconds: number): string {
+    if (seconds < 60) {
+        return `${seconds}s`;
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+
+    if (minutes < 60) {
+        return `${minutes}m ${remainingSeconds}s`;
+    }
+
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+
+    return `${hours}h ${remainingMinutes}m`;
+}
+
+function elapsedSecondsSince(value: string | null): number | null {
+    if (!value) {
+        return null;
+    }
+
+    const startedAt = new Date(value);
+    if (Number.isNaN(startedAt.getTime())) {
+        return null;
+    }
+
+    return Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 1000));
+}
+
 function isScriptTruncated(script: string): boolean {
     return script.trim().length > SCRIPT_PREVIEW_LIMIT;
 }
@@ -81,6 +112,7 @@ export function VideoHistoryPage() {
     const [expandedScripts, setExpandedScripts] = useState<Record<number, boolean>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [averageCompletionSeconds, setAverageCompletionSeconds] = useState<number | null>(null);
 
     const loadJobs = useCallback(async () => {
         setLoading(true);
@@ -95,6 +127,7 @@ export function VideoHistoryPage() {
 
             setJobs(response.data);
             setStats(response.meta.stats);
+            setAverageCompletionSeconds(response.meta.timing.average_completion_seconds);
             setCurrentPage(response.current_page);
             setLastPage(Math.max(1, response.last_page));
             setTotal(response.total);
@@ -172,6 +205,13 @@ export function VideoHistoryPage() {
                         <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Failed</p>
                         <p className="mt-1 text-2xl font-semibold text-rose-700">{stats.failed}</p>
                     </div>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-slate-200/90 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
+                    Typical completion time from your recent jobs:{' '}
+                    <span className="font-semibold text-slate-900">
+                        {averageCompletionSeconds !== null ? formatDuration(averageCompletionSeconds) : 'Not enough completed jobs yet'}
+                    </span>
                 </div>
             </article>
 
@@ -271,6 +311,23 @@ export function VideoHistoryPage() {
                                             </p>
                                             <p>
                                                 Updated: <span className="text-slate-700">{formatDateTime(job.updated_at)}</span>
+                                            </p>
+                                            <p>
+                                                Elapsed:{' '}
+                                                <span className="text-slate-700">
+                                                    {(() => {
+                                                        const elapsed = elapsedSecondsSince(job.submitted_at ?? job.created_at);
+                                                        return elapsed !== null ? formatDuration(elapsed) : 'N/A';
+                                                    })()}
+                                                </span>
+                                            </p>
+                                            <p>
+                                                ETA:{' '}
+                                                <span className="text-slate-700">
+                                                    {(job.status === 'queued' || job.status === 'submitting' || job.status === 'processing')
+                                                        ? (averageCompletionSeconds !== null ? `~${formatDuration(averageCompletionSeconds)} total (approx)` : 'Provider does not expose exact ETA')
+                                                        : 'N/A'}
+                                                </span>
                                             </p>
                                         </div>
 

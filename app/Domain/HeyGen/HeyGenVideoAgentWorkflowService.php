@@ -23,9 +23,20 @@ class HeyGenVideoAgentWorkflowService
         $videoAgentJob->error_message = null;
         $videoAgentJob->save();
 
-        $response = $this->client->generateVideoAgent([
+        $config = array_filter([
+            'avatar_id' => $videoAgentJob->avatar_id,
+            'voice_id' => $videoAgentJob->voice_id,
+        ], static fn (?string $value): bool => filled($value));
+
+        $payload = [
             'prompt' => $videoAgentJob->prompt,
-        ]);
+        ];
+
+        if ($config !== []) {
+            $payload['config'] = $config;
+        }
+
+        $response = $this->client->generateVideoAgent($payload);
 
         $data = (array) ($response['data'] ?? $response);
 

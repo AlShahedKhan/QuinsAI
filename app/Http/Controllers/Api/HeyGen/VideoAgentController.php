@@ -8,18 +8,22 @@ use App\Http\Requests\Api\HeyGen\StoreVideoAgentRequest;
 use App\Http\Resources\HeyGen\VideoAgentJobResource;
 use App\Jobs\SubmitHeyGenVideoAgentJob;
 use App\Models\HeyGenVideoAgentJob;
+use App\Services\HeyGen\HeyGenClient;
+use App\Services\HeyGen\HeyGenException;
 use App\Services\HeyGen\HeyGenQuotaException;
 use App\Services\HeyGen\HeyGenQuotaService;
 use App\Services\HeyGen\HeyGenScriptSafetyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class VideoAgentController extends Controller
 {
     public function __construct(
         private readonly HeyGenScriptSafetyService $scriptSafetyService,
         private readonly HeyGenQuotaService $quotaService,
+        private readonly HeyGenClient $heyGenClient,
     ) {
     }
 
@@ -62,6 +66,34 @@ class VideoAgentController extends Controller
         $this->scriptSafetyService->assertAllowedPrompt((string) $payload['prompt']);
 
         try {
+            $providerQuota = $this->heyGenClient->getRemainingQuota();
+        } catch (HeyGenException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'error' => [
+                    'code' => 'provider_quota_check_failed',
+                    'context' => $exception->context,
+                ],
+            ], Response::HTTP_BAD_GATEWAY);
+        } catch (Throwable) {
+            return response()->json([
+                'message' => 'Could not verify HeyGen Video Agent credits. Please try again shortly.',
+                'error' => [
+                    'code' => 'provider_quota_check_failed',
+                ],
+            ], Response::HTTP_BAD_GATEWAY);
+        }
+
+        if (! $this->hasVideoAgentQuota($providerQuota)) {
+            return response()->json([
+                'message' => 'HeyGen API credits are finished. HeyGen requires at least 0.5 API credits for Video Agent generation.',
+                'error' => [
+                    'code' => 'heygen_video_agent_quota_empty',
+                ],
+            ], Response::HTTP_PAYMENT_REQUIRED);
+        }
+
+        try {
             $quota = $this->quotaService->consumeVideoRequest($user);
         } catch (HeyGenQuotaException $exception) {
             return response()->json([
@@ -74,6 +106,8 @@ class VideoAgentController extends Controller
 
         $videoAgentJob = HeyGenVideoAgentJob::query()->create([
             'user_id' => $user->id,
+            'avatar_id' => filled($payload['avatar_id'] ?? null) ? (string) $payload['avatar_id'] : null,
+            'voice_id' => filled($payload['voice_id'] ?? null) ? (string) $payload['voice_id'] : null,
             'prompt' => (string) $payload['prompt'],
             'status' => VideoJobStatus::Queued,
         ]);
@@ -88,5 +122,15 @@ class VideoAgentController extends Controller
                 'video_requests_remaining' => max(0, $quota->daily_request_limit - $quota->video_requests),
             ],
         ], Response::HTTP_ACCEPTED);
+    }
+
+    /**
+     * @param  array<string, mixed>  $quotaPayload
+     */
+    private function hasVideoAgentQuota(array $quotaPayload): bool
+    {
+        $remainingQuota = data_get($quotaPayload, 'data.remaining_quota');
+
+        return is_numeric($remainingQuota) && (float) $remainingQuota > 0;
     }
 }

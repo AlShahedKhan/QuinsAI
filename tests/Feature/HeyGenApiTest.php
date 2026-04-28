@@ -10,6 +10,7 @@ use App\Models\HeyGenVideoJob;
 use App\Models\HeyGenWebhookEvent;
 use App\Models\User;
 use App\Services\HeyGen\HeyGenCatalogService;
+use App\Services\HeyGen\HeyGenClient;
 use App\Services\HeyGen\HeyGenPublicAvatarDetailService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -17,6 +18,20 @@ use Laravel\Sanctum\Sanctum;
 use Mockery\MockInterface;
 
 uses(RefreshDatabase::class);
+
+function mockAvailableHeyGenApiCredits(): void
+{
+    $mock = \Mockery::mock(HeyGenClient::class);
+    $mock->shouldReceive('getRemainingQuota')
+        ->andReturn([
+            'data' => [
+                'remaining_quota' => 10,
+                'details' => [],
+            ],
+        ]);
+
+    app()->instance(HeyGenClient::class, $mock);
+}
 
 test('video creation endpoint requires auth', function () {
     $this->postJson('/api/heygen/videos', [
@@ -28,6 +43,8 @@ test('video creation endpoint requires auth', function () {
 
 test('authenticated user can queue a heygen video job', function () {
     Queue::fake();
+    mockAvailableHeyGenApiCredits();
+
     $user = User::factory()->create([
         'email_verified_at' => now(),
     ]);
@@ -119,6 +136,7 @@ test('video index supports status filters and returns overall stats', function (
 
 test('quota blocks requests when daily limit is reached', function () {
     Queue::fake();
+    mockAvailableHeyGenApiCredits();
     config()->set('services.heygen.daily_request_limit', 1);
 
     $user = User::factory()->create(['email_verified_at' => now()]);
@@ -139,6 +157,8 @@ test('quota blocks requests when daily limit is reached', function () {
 
 test('unverified users can access heygen api when authenticated', function () {
     Queue::fake();
+    mockAvailableHeyGenApiCredits();
+
     $user = User::factory()->create([
         'email_verified_at' => null,
     ]);
@@ -152,6 +172,30 @@ test('unverified users can access heygen api when authenticated', function () {
         ->assertJsonPath('data.status', 'queued');
 
     Queue::assertPushed(SubmitHeyGenVideoJob::class, 1);
+});
+
+test('quota endpoint returns heygen api credit balance', function () {
+    $user = User::factory()->create(['email_verified_at' => now()]);
+    Sanctum::actingAs($user);
+
+    $this->mock(HeyGenClient::class, function (MockInterface $mock): void {
+        $mock->shouldReceive('getRemainingQuota')
+            ->once()
+            ->andReturn([
+                'data' => [
+                    'remaining_quota' => 2,
+                    'details' => [
+                        'video_agent_v2_free_video' => 1,
+                    ],
+                ],
+            ]);
+    });
+
+    $this->getJson('/api/heygen/quota')
+        ->assertOk()
+        ->assertJsonPath('data.remaining_quota', 2)
+        ->assertJsonPath('data.is_empty', false)
+        ->assertJsonPath('data.details.video_agent_v2_free_video', 1);
 });
 
 test('catalog endpoint can fetch avatars only without voices', function () {

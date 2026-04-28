@@ -130,7 +130,10 @@ return [
     'refresh' => [
         'ttl_days' => (int) env('AUTH_REFRESH_TOKEN_TTL_DAYS', 30),
         'cookie_name' => env('AUTH_REFRESH_COOKIE_NAME', 'refresh_token'),
-        'cookie_secure' => filter_var(env('AUTH_REFRESH_COOKIE_SECURE', true), FILTER_VALIDATE_BOOL),
+        'cookie_secure' => filter_var(
+            env('AUTH_REFRESH_COOKIE_SECURE', strtolower((string) env('APP_ENV', 'production')) !== 'local'),
+            FILTER_VALIDATE_BOOL
+        ),
         'cookie_domain' => env('AUTH_REFRESH_COOKIE_DOMAIN'),
     ],
 

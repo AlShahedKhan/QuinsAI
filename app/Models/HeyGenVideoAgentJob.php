@@ -18,6 +18,8 @@ class HeyGenVideoAgentJob extends Model
      */
     protected $fillable = [
         'user_id',
+        'avatar_id',
+        'voice_id',
         'provider_video_id',
         'prompt',
         'status',
