@@ -43,7 +43,7 @@ Inside PostgreSQL:
 
 ```sql
 CREATE DATABASE quinsai;
-CREATE USER quinsai_user WITH ENCRYPTED PASSWORD 'CHANGE_THIS_PASSWORD';
+CREATE USER quinsai_user WITH ENCRYPTED PASSWORD 'root';
 GRANT ALL PRIVILEGES ON DATABASE quinsai TO quinsai_user;
 \q
 ```
